@@ -37,4 +37,20 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         seed_demo_data()
         print("Demo data loaded.")
 
+    @app.cli.command("reset-orders")
+    def reset_orders() -> None:
+        """Remove every order and its related lines/payments."""
+        from .models import Order
+
+        orders = Order.query.all()
+        if not orders:
+            print("No orders to delete.")
+            return
+
+        deleted = len(orders)
+        for order in orders:
+            db.session.delete(order)
+        db.session.commit()
+        print(f"Deleted {deleted} orders and their related records.")
+
     return app

@@ -27,8 +27,9 @@ def _require_user() -> StaffUser | None:
 
 
 def _active_orders(table_id: int) -> list[Order]:
+    """Return orders that still requere servei at the table."""
     return (
-        Order.query.filter(Order.table_id == table_id, Order.payment_status != PaymentStatus.PAID)
+        Order.query.filter(Order.table_id == table_id, Order.fulfillment_status != FulfillmentStatus.SERVED)
         .order_by(Order.created_at.desc())
         .all()
     )

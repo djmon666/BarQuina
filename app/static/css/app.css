@@ -55,3 +55,28 @@ body {
 .order-row-served {
     background-color: #e0f3e5 !important;
 }
+.mobile-order-card {
+    border: 0;
+    color: #fff;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+}
+.mobile-order-card.mobile-order-pending {
+    background-color: #4c1a1a;
+}
+.mobile-order-card.mobile-order-pending.active {
+    background-color: #b3261e;
+    transform: translateX(2px);
+}
+.mobile-order-card.mobile-order-paid {
+    background-color: #6a4a00;
+}
+.mobile-order-card.mobile-order-paid.active {
+    background-color: #d97706;
+    transform: translateX(2px);
+}
+.mobile-order-card:not(.active) {
+    opacity: 0.9;
+}
+.mobile-order-card small {
+    color: rgba(255, 255, 255, 0.85);
+}

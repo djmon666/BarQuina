@@ -32,8 +32,9 @@
             <div class="list-group list-group-flush">
                 {% for ord in orders %}
                 {% set active = selected_order and selected_order.id == ord.id %}
-                {% set state_class = 'order-item-delivered' if ord.fulfillment_status == fulfillment_status.SERVED else 'order-item-pending' %}
-                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center {{ state_class }} {% if active %}active{% endif %}" href="{{ url_for('mobile.table_orders', table_id=table.id, order_id=ord.id) }}" aria-current="{{ 'true' if active else 'false' }}">
+                {% set is_paid = ord.payment_status == payment_status.PAID %}
+                {% set state_class = 'mobile-order-paid' if is_paid else 'mobile-order-pending' %}
+                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center mobile-order-card {{ state_class }} {% if active %}active{% endif %}" href="{{ url_for('mobile.table_orders', table_id=table.id, order_id=ord.id) }}" aria-current="{{ 'true' if active else 'false' }}">
                     <div>
                         <div>Comanda #{{ ord.id }}</div>
                         <small>Servei: {{ ord.fulfillment_status.value }} · Pagament: {{ ord.payment_status.value }}</small>
