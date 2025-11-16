@@ -1,0 +1,20 @@
+{% extends "mobile/base.html" %}
+{% block content %}
+<div class="text-center">
+    <h1 class="mb-4">Qui ets?</h1>
+    {% if users %}
+    <div class="row g-3">
+        {% for user in users %}
+        <div class="col-6 col-md-4">
+            <form method="post" action="{{ url_for('mobile.select_user') }}">
+                <input type="hidden" name="user_id" value="{{ user.id }}">
+                <button class="btn btn-outline-light w-100 py-3">{{ user.name }}</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="lead">Cap usuari actiu. Afegeix-ne un des del panell principal.</p>
+    {% endif %}
+</div>
+{% endblock %}

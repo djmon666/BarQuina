@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ca">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BarQuina Mobile</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+    <style>
+        body { background:#10121a; color:#f7f8fa; }
+        .card { border-radius: 1rem; }
+    </style>
+</head>
+<body class="min-vh-100 d-flex flex-column">
+<nav class="navbar navbar-dark bg-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="{{ url_for('mobile.tables') }}">Terminal Mòbil</a>
+        <div class="d-flex gap-2 align-items-center">
+            {% if session.get('mobile_user_name') %}
+                <span class="text-white-50 small">{{ session['mobile_user_name'] }}</span>
+                <a class="btn btn-sm btn-outline-light" href="{{ url_for('mobile.logout') }}">Sortir</a>
+            {% endif %}
+        </div>
+    </div>
+</nav>
+<main class="container py-3 flex-grow-1">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+</main>
+<script src="{{ url_for('static', filename='vendor/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/socket.io.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/realtime.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ca">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BarQuina</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/">BarQuina</a>
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item"><a class="nav-link" href="/">Quadre</a></li>
+                <li class="nav-item"><a class="nav-link" href="/tables">Taules</a></li>
+                <li class="nav-item"><a class="nav-link" href="/catalog/products">Productes</a></li>
+                <li class="nav-item"><a class="nav-link" href="/catalog/inventory">Inventari</a></li>
+                <li class="nav-item"><a class="nav-link" href="/cash/sessions">Caixa</a></li>
+                <li class="nav-item"><a class="nav-link" href="/users/">Usuaris</a></li>
+                <li class="nav-item"><a class="nav-link" href="/mobile/">Terminal mòbil</a></li>
+            </ul>
+        </div>
+    </div>
+</nav>
+<div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="mb-3">
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+</div>
+<script src="{{ url_for('static', filename='vendor/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/socket.io.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/realtime.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

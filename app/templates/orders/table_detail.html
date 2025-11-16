@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ table.name }}</h1>
+{% if order %}
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <span>Comanda #{{ order.id }}</span>
+                    {% if order.created_by %}
+                    <div class="text-muted small">Creat des del terminal per {{ order.created_by.name }}</div>
+                    {% endif %}
+                </div>
+                <div class="d-flex flex-column gap-2">
+                    <div class="d-flex flex-wrap gap-2">
+                        <span class="badge {% if order.fulfillment_status.value == 'servida' %}bg-success{% else %}bg-danger{% endif %}">Servei: {{ order.fulfillment_status.value }}</span>
+                        <span class="badge {% if order.payment_status.value == 'cobrada' %}bg-success{% else %}bg-warning text-dark{% endif %}">Pagament: {{ order.payment_status.value }}</span>
+                    </div>
+                    <form method="post" action="{{ url_for('orders.update_order_status', order_id=order.id) }}" class="d-flex flex-wrap gap-2">
+                        <label class="small text-muted mb-0">Servei</label>
+                        <select class="form-select form-select-sm" name="fulfillment_status">
+                            {% for status in fulfillment_statuses %}
+                            <option value="{{ status.value }}" {% if order.fulfillment_status == status %}selected{% endif %}>{{ status.value }}</option>
+                            {% endfor %}
+                        </select>
+                        <label class="small text-muted mb-0">Pagament</label>
+                        <select class="form-select form-select-sm" name="payment_status">
+                            {% for status in payment_statuses %}
+                            <option value="{{ status.value }}" {% if order.payment_status == status %}selected{% endif %}>{{ status.value }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="btn btn-sm btn-outline-primary ms-auto" type="submit">Actualitza</button>
+                    </form>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table mb-0">
+                    <thead>
+                        <tr><th></th><th>Producte</th><th>Quantitat</th><th>Estat</th><th>Total</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for item in order.items %}
+                        <tr>
+                            <td>
+                                <input
+                                    type="checkbox"
+                                    name="item_ids"
+                                    class="js-item"
+                                    data-price="{{ item.line_total() }}"
+                                    value="{{ item.id }}"
+                                    form="splitPayment"
+                                    {% if item.status.value=='cobrada' %}disabled{% endif %}
+                                >
+                            </td>
+                            <td>{{ item.product.name }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>
+                                <form method="post" action="{{ url_for('orders.update_item_status', order_id=order.id, item_id=item.id) }}" class="d-flex gap-2">
+                                    <select class="form-select form-select-sm" name="status">
+                                        {% for status in item_statuses %}
+                                        <option value="{{ status.value }}" {% if item.status == status %}selected{% endif %}>{{ status.value }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <button class="btn btn-sm btn-outline-secondary">✔</button>
+                                </form>
+                            </td>
+                            <td>€ {{ '%.2f'|format(item.line_total()) }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                <h5>Pagaments</h5>
+                <ul class="list-group mb-3">
+                {% for payment in order.payments %}
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>{{ payment.method.value }} - {{ payment.created_at.strftime('%H:%M') }}</span>
+                        <strong>€ {{ '%.2f'|format(payment.amount) }}</strong>
+                    </li>
+                {% else %}
+                    <li class="list-group-item">Cap pagament encara.</li>
+                {% endfor %}
+                </ul>
+                <div class="d-flex justify-content-between">
+                    <span>Total</span>
+                    <strong>€ {{ '%.2f'|format(order.subtotal()) }}</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>Pendent</span>
+                    <strong id="pending">€ {{ '%.2f'|format(order.outstanding_total()) }}</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card mb-3">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-0">Afegir productes</h5>
+                    <small class="text-muted">Obre el catàleg scrollable i selecciona quantitats amb + / -</small>
+                </div>
+                <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#productPickerModal">Obrir catàleg</button>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">Pagament parcial</div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('orders.add_payment', order_id=order.id) }}" id="splitPayment">
+                    <input type="hidden" name="order_id" value="{{ order.id }}">
+                    <div class="form-floating mb-3">
+                        <select class="form-select" name="method">
+                            <option value="efectiu">Efectiu</option>
+                            <option value="targeta">Targeta</option>
+                            <option value="mixt">Mixt</option>
+                        </select>
+                        <label>Mètode</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <input class="form-control" name="note" placeholder="Client 1">
+                        <label>Nota</label>
+                    </div>
+                    <p>Subtotal seleccionat: <strong id="selectedTotal">€ 0.00</strong></p>
+                    <button class="btn btn-success" type="submit">Registrar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<p>No hi ha comandes obertes.</p>
+<form method="post" action="{{ url_for('orders.create_order', table_id=table.id) }}">
+    <button class="btn btn-primary">Crear comanda</button>
+</form>
+{% endif %}
+{% if order %}
+<div class="modal fade" id="productPickerModal" tabindex="-1" aria-labelledby="productPickerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="productPickerModalLabel">Afegir productes a la comanda</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tanca"></button>
+            </div>
+            <div class="modal-body">
+                <form method="post" action="{{ url_for('orders.add_items_bulk', order_id=order.id) }}" id="modalAddForm">
+                    {% for category, products in product_groups.items() %}
+                    <div class="mb-4">
+                        <h5>{{ category|title }}</h5>
+                        {% for product in products %}
+                        <div class="d-flex align-items-center mb-2 gap-2">
+                            <div class="flex-grow-1">
+                                <div>{{ product.name }}</div>
+                                <small class="text-muted">€ {{ '%.2f'|format(product.price) }}</small>
+                            </div>
+                            <div class="btn-group" role="group">
+                                <button class="btn btn-soft-danger btn-sm js-minus" type="button" data-target="modalQty{{ product.id }}">-</button>
+                                <input class="form-control form-control-sm text-center js-qty" name="quantity_{{ product.id }}" id="modalQty{{ product.id }}" type="number" min="0" value="0" data-price="{{ product.price }}" style="width:70px;">
+                                <button class="btn btn-soft-success btn-sm js-plus" type="button" data-target="modalQty{{ product.id }}">+</button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                    <p class="mt-3">Subtotal seleccionat: <strong id="modalSelectionTotal">€ 0.00</strong></p>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel·la</button>
+                <button type="submit" form="modalAddForm" class="btn btn-primary">Afegir a la comanda</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+const checkboxes = document.querySelectorAll('.js-item');
+const output = document.getElementById('selectedTotal');
+function updateSubtotal() {
+    let total = 0;
+    checkboxes.forEach(cb => {
+        if (cb.checked && !cb.disabled) {
+            total += parseFloat(cb.dataset.price);
+        }
+    });
+    output.textContent = `€ ${total.toFixed(2)}`;
+}
+checkboxes.forEach(cb => cb.addEventListener('change', updateSubtotal));
+updateSubtotal();
+</script>
+{% if order %}
+<script>
+const modalQtyInputs = document.querySelectorAll('#productPickerModal .js-qty');
+const modalTotalOutput = document.getElementById('modalSelectionTotal');
+function modalUpdateTotal() {
+    let total = 0;
+    modalQtyInputs.forEach((input) => {
+        const count = parseInt(input.value || '0', 10);
+        if (count > 0) {
+            total += count * parseFloat(input.dataset.price);
+        }
+    });
+    if (modalTotalOutput) {
+        modalTotalOutput.textContent = `€ ${total.toFixed(2)}`;
+    }
+}
+function modalAdjustValue(targetId, delta) {
+    const input = document.getElementById(targetId);
+    if (!input) return;
+    const current = parseInt(input.value || '0', 10);
+    const next = Math.max(current + delta, 0);
+    input.value = next;
+    modalUpdateTotal();
+}
+document.querySelectorAll('#productPickerModal .js-plus').forEach((btn) => {
+    btn.addEventListener('click', () => modalAdjustValue(btn.dataset.target, 1));
+});
+document.querySelectorAll('#productPickerModal .js-minus').forEach((btn) => {
+    btn.addEventListener('click', () => modalAdjustValue(btn.dataset.target, -1));
+});
+modalQtyInputs.forEach((input) => input.addEventListener('input', modalUpdateTotal));
+modalUpdateTotal();
+</script>
+{% endif %}
+<script>
+if (window.barquinaRealtime) {
+    const watchedTableId = Number('{{ table.id }}');
+    window.barquinaRealtime.onOrderUpdate((payload) => {
+        if (payload && payload.table_id === watchedTableId) {
+            window.location.reload();
+        }
+    });
+}
+</script>
+{% endblock %}

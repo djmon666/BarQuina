@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Taules</h1>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newTable">Nova taula</button>
+</div>
+<div class="row g-3">
+    {% for table in tables %}
+    <div class="col-sm-6 col-md-4 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5>{{ table.name }}</h5>
+                <p class="text-muted">{{ table.seats }} places</p>
+                <a class="btn btn-outline-secondary" href="{{ url_for('orders.table_detail', table_id=table.id) }}">Obrir</a>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <p>No hi ha taules creades.</p>
+    {% endfor %}
+</div>
+
+<div class="modal fade" id="newTable" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post">
+                <div class="modal-header"><h5 class="modal-title">Nova taula</h5></div>
+                <div class="modal-body">
+                    <div class="form-floating mb-3">
+                        <input class="form-control" name="name" placeholder="Taula 1">
+                        <label>Nom</label>
+                    </div>
+                    <div class="form-floating">
+                        <input class="form-control" type="number" name="seats" value="4">
+                        <label>Places</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel·la</button>
+                    <button class="btn btn-primary" type="submit">Crea</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

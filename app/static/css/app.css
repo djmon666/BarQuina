@@ -1,0 +1,53 @@
+body {
+    background-color: #f5f6fa;
+}
+.card h5 {
+    margin-bottom: 0;
+}
+.btn-soft-success,
+.btn-soft-success:hover,
+.btn-soft-success:focus {
+    background-color: #28c48f;
+    border-color: #28c48f;
+    color: #fff;
+}
+.btn-soft-danger,
+.btn-soft-danger:hover,
+.btn-soft-danger:focus {
+    background-color: #f06c6c;
+    border-color: #f06c6c;
+    color: #fff;
+}
+.order-item-pending {
+    background-color: #5b1d1d;
+    border-color: #5b1d1d;
+    color: #fff;
+}
+.order-item-pending:hover,
+.order-item-pending:focus,
+.order-item-pending.active {
+    background-color: #752626;
+    border-color: #752626;
+    color: #fff;
+}
+.order-item-delivered {
+    background-color: #1f5a34;
+    border-color: #1f5a34;
+    color: #fff;
+}
+.order-item-delivered:hover,
+.order-item-delivered:focus,
+.order-item-delivered.active {
+    background-color: #287a46;
+    border-color: #287a46;
+    color: #fff;
+}
+.table-clickable tbody tr {
+    cursor: pointer;
+}
+.order-row-pending {
+    background-color: #fbe2e2 !important;
+}
+.order-row-served {
+    background-color: #e0f3e5 !important;
+}

@@ -1,0 +1,28 @@
+{% extends "mobile/base.html" %}
+{% block content %}
+<h1 class="mb-3">Taules assignables</h1>
+<div class="row g-3">
+    {% for table in tables %}
+    <div class="col-6 col-md-4">
+        <a class="card bg-secondary text-white text-center p-3 text-decoration-none" href="{{ url_for('mobile.table_orders', table_id=table.id) }}">
+            <div class="fs-3">{{ table.name }}</div>
+            {% set active_orders = table.orders|selectattr('payment_status', 'ne', payment_status.PAID)|list %}
+            {% if active_orders %}
+                <span class="badge bg-warning text-dark mt-2">{{ active_orders|length }} comanda{% if active_orders|length > 1 %}s{% endif %}</span>
+            {% else %}
+                <span class="badge bg-success mt-2">Lliure</span>
+            {% endif %}
+        </a>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+if (window.barquinaRealtime) {
+    window.barquinaRealtime.onOrderUpdate(() => {
+        window.location.reload();
+    });
+}
+</script>
+{% endblock %}

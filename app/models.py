@@ -1,0 +1,207 @@
+from __future__ import annotations
+
+from datetime import datetime
+from enum import Enum
+
+from .extensions import db
+
+
+class FulfillmentStatus(str, Enum):
+    PENDING_DELIVERY = "pendent_portar"
+    SERVED = "servida"
+
+
+class PaymentStatus(str, Enum):
+    PENDING_PAYMENT = "pendent_cobrar"
+    PAID = "cobrada"
+
+
+class OrderItemStatus(str, Enum):
+    PENDING = "pendent"
+    SERVED = "servida"
+    PAID = "cobrada"
+
+
+class PaymentMethod(str, Enum):
+    CASH = "efectiu"
+    CARD = "targeta"
+    MIXED = "mixt"
+
+
+class CashMovementType(str, Enum):
+    SALE = "venda"
+    DEPOSIT = "entrada"
+    WITHDRAWAL = "sortida"
+    ADJUSTMENT = "ajust"
+
+
+class Table(db.Model):
+    __tablename__ = "tables"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+    seats = db.Column(db.Integer, default=4)
+    orders = db.relationship("Order", back_populates="table", cascade="all, delete-orphan")
+
+    def __repr__(self) -> str:  # pragma: no cover - repr helper
+        return f"Table({self.name})"
+
+
+class Product(db.Model):
+    __tablename__ = "products"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
+    category = db.Column(db.String(30), nullable=False, default="beguda")
+    price = db.Column(db.Float, nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+
+    order_items = db.relationship("OrderItem", back_populates="product")
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"Product({self.name})"
+
+
+class InventoryEntry(db.Model):
+    __tablename__ = "inventory_entries"
+
+    id = db.Column(db.Integer, primary_key=True)
+    product_name = db.Column(db.String(80), nullable=False)
+    category = db.Column(db.String(30), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    unit_cost = db.Column(db.Float, nullable=False)
+    vendor = db.Column(db.String(80))
+    purchased_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class StaffUser(db.Model):
+    __tablename__ = "staff_users"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(60), unique=True, nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+
+    orders = db.relationship("Order", back_populates="created_by")
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"StaffUser({self.name})"
+
+
+class Order(db.Model):
+    __tablename__ = "orders"
+
+    id = db.Column(db.Integer, primary_key=True)
+    table_id = db.Column(db.Integer, db.ForeignKey("tables.id"), nullable=False)
+    created_by_id = db.Column(db.Integer, db.ForeignKey("staff_users.id"))
+    status = db.Column(db.String(32), default=FulfillmentStatus.PENDING_DELIVERY.value, nullable=False)
+    fulfillment_status = db.Column(
+        db.Enum(FulfillmentStatus), default=FulfillmentStatus.PENDING_DELIVERY, nullable=False
+    )
+    payment_status = db.Column(db.Enum(PaymentStatus), default=PaymentStatus.PENDING_PAYMENT, nullable=False)
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    table = db.relationship("Table", back_populates="orders")
+    created_by = db.relationship("StaffUser", back_populates="orders")
+    items = db.relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+    payments = db.relationship("Payment", back_populates="order", cascade="all, delete-orphan")
+
+    def subtotal(self) -> float:
+        return sum(item.line_total() for item in self.items)
+
+    def paid_total(self) -> float:
+        return sum(payment.amount for payment in self.payments)
+
+    def outstanding_total(self) -> float:
+        return max(self.subtotal() - self.paid_total(), 0.0)
+
+    def recalc_status(self) -> None:
+        if self.items and all(item.status == OrderItemStatus.SERVED for item in self.items):
+            self.fulfillment_status = FulfillmentStatus.SERVED
+        else:
+            self.fulfillment_status = FulfillmentStatus.PENDING_DELIVERY
+
+        if self.subtotal() > 0 and self.outstanding_total() <= 0:
+            self.payment_status = PaymentStatus.PAID
+        else:
+            self.payment_status = PaymentStatus.PENDING_PAYMENT
+
+        self.sync_legacy_status()
+
+    def sync_legacy_status(self) -> None:
+        status = self.fulfillment_status or FulfillmentStatus.PENDING_DELIVERY
+        if isinstance(status, str):
+            self.status = status
+        else:
+            self.status = status.value
+
+
+class OrderItem(db.Model):
+    __tablename__ = "order_items"
+
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey("orders.id"), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=False)
+    quantity = db.Column(db.Integer, default=1)
+    unit_price = db.Column(db.Float, nullable=False)
+    status = db.Column(db.Enum(OrderItemStatus), default=OrderItemStatus.PENDING, nullable=False)
+    notes = db.Column(db.String(120))
+
+    order = db.relationship("Order", back_populates="items")
+    product = db.relationship("Product", back_populates="order_items")
+    payment_links = db.relationship("PaymentItem", back_populates="order_item", cascade="all, delete-orphan")
+
+    def line_total(self) -> float:
+        return round(self.quantity * self.unit_price, 2)
+
+
+class Payment(db.Model):
+    __tablename__ = "payments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey("orders.id"), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    method = db.Column(db.Enum(PaymentMethod), default=PaymentMethod.CASH, nullable=False)
+    note = db.Column(db.String(120))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    order = db.relationship("Order", back_populates="payments")
+    items = db.relationship("PaymentItem", back_populates="payment", cascade="all, delete-orphan")
+
+
+class PaymentItem(db.Model):
+    __tablename__ = "payment_items"
+
+    id = db.Column(db.Integer, primary_key=True)
+    payment_id = db.Column(db.Integer, db.ForeignKey("payments.id"), nullable=False)
+    order_item_id = db.Column(db.Integer, db.ForeignKey("order_items.id"), nullable=False)
+
+    payment = db.relationship("Payment", back_populates="items")
+    order_item = db.relationship("OrderItem", back_populates="payment_links")
+
+
+class CashSession(db.Model):
+    __tablename__ = "cash_sessions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    opened_at = db.Column(db.DateTime, default=datetime.utcnow)
+    closed_at = db.Column(db.DateTime)
+    opening_float = db.Column(db.Float, nullable=False, default=0.0)
+    closing_amount = db.Column(db.Float)
+    is_open = db.Column(db.Boolean, default=True)
+
+    movements = db.relationship("CashMovement", back_populates="session", cascade="all, delete-orphan")
+
+
+class CashMovement(db.Model):
+    __tablename__ = "cash_movements"
+
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.Integer, db.ForeignKey("cash_sessions.id"), nullable=False)
+    movement_type = db.Column(db.Enum(CashMovementType), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    note = db.Column(db.String(120))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    session = db.relationship("CashSession", back_populates="movements")
