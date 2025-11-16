@@ -13,36 +13,44 @@
                     {% endif %}
                 </div>
                 <div class="d-flex flex-column gap-2">
+                    {% set next_fulfillment = 'servida' if order.fulfillment_status.value != 'servida' else 'pendent_portar' %}
+                    {% set next_payment = 'cobrada' if order.payment_status.value != 'cobrada' else 'pendent_cobrar' %}
                     <div class="d-flex flex-wrap gap-2">
-                        <span class="badge {% if order.fulfillment_status.value == 'servida' %}bg-success{% else %}bg-danger{% endif %}">Servei: {{ order.fulfillment_status.value }}</span>
-                        <span class="badge {% if order.payment_status.value == 'cobrada' %}bg-success{% else %}bg-warning text-dark{% endif %}">Pagament: {{ order.payment_status.value }}</span>
+                        <form method="post" action="{{ url_for('orders.update_order_status', order_id=order.id) }}" class="m-0">
+                            <input type="hidden" name="fulfillment_status" value="{{ next_fulfillment }}">
+                            <button type="submit" class="badge border-0 {% if order.fulfillment_status.value == 'servida' %}bg-success{% else %}bg-danger{% endif %} status-toggle" title="Clica per alternar l'estat de servei">
+                                Servei: {{ order.fulfillment_status.value }}
+                            </button>
+                        </form>
+                        <form method="post" action="{{ url_for('orders.update_order_status', order_id=order.id) }}" class="m-0">
+                            <input type="hidden" name="payment_status" value="{{ next_payment }}">
+                            <button type="submit" class="badge border-0 {% if order.payment_status.value == 'cobrada' %}bg-success{% else %}bg-warning text-dark{% endif %} status-toggle" title="Clica per alternar l'estat de pagament">
+                                Pagament: {{ order.payment_status.value }}
+                            </button>
+                        </form>
                     </div>
-                    <form method="post" action="{{ url_for('orders.update_order_status', order_id=order.id) }}" class="d-flex flex-wrap gap-2">
-                        <label class="small text-muted mb-0">Servei</label>
-                        <select class="form-select form-select-sm" name="fulfillment_status">
-                            {% for status in fulfillment_statuses %}
-                            <option value="{{ status.value }}" {% if order.fulfillment_status == status %}selected{% endif %}>{{ status.value }}</option>
-                            {% endfor %}
-                        </select>
-                        <label class="small text-muted mb-0">Pagament</label>
-                        <select class="form-select form-select-sm" name="payment_status">
-                            {% for status in payment_statuses %}
-                            <option value="{{ status.value }}" {% if order.payment_status == status %}selected{% endif %}>{{ status.value }}</option>
-                            {% endfor %}
-                        </select>
-                        <button class="btn btn-sm btn-outline-primary ms-auto" type="submit">Actualitza</button>
-                    </form>
+                    <small class="text-muted">Clica una badge per canviar l'estat</small>
                 </div>
             </div>
+            <div class="d-flex justify-content-between align-items-center px-3 py-2 border-top">
+                <small class="text-muted mb-0">Selecciona línies per registrar pagaments</small>
+                <button class="btn btn-sm btn-outline-secondary" type="button" id="selectAllItems">Selecciona-ho tot</button>
+            </div>
             <div class="table-responsive">
-                <table class="table mb-0">
+                <table class="table table-clickable mb-0">
                     <thead>
-                        <tr><th></th><th>Producte</th><th>Quantitat</th><th>Estat</th><th>Total</th></tr>
+                        <tr>
+                            <th class="d-none"></th>
+                            <th>Producte</th>
+                            <th>Quantitat</th>
+                            <th>Estat</th>
+                            <th>Total</th>
+                        </tr>
                     </thead>
                     <tbody>
                     {% for item in order.items %}
-                        <tr>
-                            <td>
+                        <tr class="js-item-row" data-item-id="{{ item.id }}" role="button" aria-pressed="false">
+                            <td class="d-none">
                                 <input
                                     type="checkbox"
                                     name="item_ids"
@@ -55,7 +63,7 @@
                             </td>
                             <td>{{ item.product.name }}</td>
                             <td>{{ item.quantity }}</td>
-                            <td>
+                            <td class="js-no-selection">
                                 <form method="post" action="{{ url_for('orders.update_item_status', order_id=order.id, item_id=item.id) }}" class="d-flex gap-2">
                                     <select class="form-select form-select-sm" name="status">
                                         {% for status in item_statuses %}
@@ -178,18 +186,91 @@
 {% endblock %}
 {% block scripts %}
 <script>
-const checkboxes = document.querySelectorAll('.js-item');
+const checkboxes = Array.from(document.querySelectorAll('.js-item'));
 const output = document.getElementById('selectedTotal');
+const selectAllButton = document.getElementById('selectAllItems');
+
+const enabledCheckboxes = () => checkboxes.filter((cb) => !cb.disabled);
+
 function updateSubtotal() {
     let total = 0;
-    checkboxes.forEach(cb => {
+    checkboxes.forEach((cb) => {
         if (cb.checked && !cb.disabled) {
             total += parseFloat(cb.dataset.price);
         }
     });
-    output.textContent = `€ ${total.toFixed(2)}`;
+    if (output) {
+        output.textContent = `€ ${total.toFixed(2)}`;
+    }
+    refreshSelectAllLabel();
 }
-checkboxes.forEach(cb => cb.addEventListener('change', updateSubtotal));
+function syncRowState(cb) {
+    const row = cb.closest('.js-item-row');
+    if (!row) return;
+    const isActive = cb.checked && !cb.disabled;
+    row.classList.toggle('table-active', isActive);
+    row.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+}
+function areAllSelected() {
+    const enabled = enabledCheckboxes();
+    if (!enabled.length) {
+        return false;
+    }
+    return enabled.every((cb) => cb.checked);
+}
+function refreshSelectAllLabel() {
+    if (!selectAllButton) return;
+    const allSelected = areAllSelected();
+    selectAllButton.textContent = allSelected ? 'Desselecciona-ho tot' : 'Selecciona-ho tot';
+    selectAllButton.setAttribute('aria-pressed', allSelected ? 'true' : 'false');
+}
+
+checkboxes.forEach((cb) => {
+    cb.addEventListener('change', () => {
+        syncRowState(cb);
+        updateSubtotal();
+    });
+    syncRowState(cb);
+});
+
+const itemRows = Array.from(document.querySelectorAll('.js-item-row'));
+function normalizeTarget(target) {
+    if (target && target.nodeType !== 1) {
+        return target.parentElement || null;
+    }
+    return target;
+}
+function isInteractive(target) {
+    const el = normalizeTarget(target);
+    return Boolean(el && el.closest('button, select, form, a, textarea, label, input'));
+}
+itemRows.forEach((row) => {
+    row.addEventListener('click', (event) => {
+        if (isInteractive(event.target)) {
+            return;
+        }
+        const checkbox = row.querySelector('.js-item');
+        if (!checkbox || checkbox.disabled) {
+            return;
+        }
+        checkbox.checked = !checkbox.checked;
+        syncRowState(checkbox);
+        updateSubtotal();
+    });
+});
+
+if (selectAllButton) {
+    selectAllButton.addEventListener('click', () => {
+        const shouldSelectAll = !areAllSelected();
+        checkboxes.forEach((cb) => {
+            if (cb.disabled) return;
+            cb.checked = shouldSelectAll;
+            syncRowState(cb);
+        });
+        updateSubtotal();
+    });
+}
+
 updateSubtotal();
 </script>
 {% if order %}

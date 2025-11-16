@@ -45,6 +45,10 @@ body {
 .table-clickable tbody tr {
     cursor: pointer;
 }
+.table-clickable tbody tr .js-no-selection,
+.table-clickable tbody tr .js-no-selection * {
+    cursor: default;
+}
 .order-row-pending {
     background-color: #fbe2e2 !important;
 }
