@@ -12,8 +12,8 @@
         {% if selected_order %}
         <div>
             <div>Comanda #{{ selected_order.id }}</div>
-            <div class="small">Servei: <strong>{{ selected_order.fulfillment_status.value }}</strong></div>
-            <div class="small">Pagament: <strong>{{ selected_order.payment_status.value }}</strong></div>
+            <div class="small">Servei: <strong>{{ selected_order.fulfillment_status.label }}</strong></div>
+            <div class="small">Pagament: <strong>{{ selected_order.payment_status.label }}</strong></div>
             <div>Total: <strong>€ {{ '%.2f'|format(selected_order.subtotal()) }}</strong></div>
             <div>Pendent: <strong>€ {{ '%.2f'|format(selected_order.outstanding_total()) }}</strong></div>
         </div>
@@ -37,7 +37,7 @@
                 <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center mobile-order-card {{ state_class }} {% if active %}active{% endif %}" href="{{ url_for('mobile.table_orders', table_id=table.id, order_id=ord.id) }}" aria-current="{{ 'true' if active else 'false' }}">
                     <div>
                         <div>Comanda #{{ ord.id }}</div>
-                        <small>Servei: {{ ord.fulfillment_status.value }} · Pagament: {{ ord.payment_status.value }}</small>
+                        <small>Servei: {{ ord.fulfillment_status.label }} · Pagament: {{ ord.payment_status.label }}</small>
                     </div>
                     <small>{{ ord.items|length }} ítems · € {{ '%.2f'|format(ord.subtotal()) }}</small>
                 </a>
@@ -56,11 +56,20 @@
                     <div class="card-body p-0">
                         <ul class="list-group list-group-flush">
                         {% for item in selected_order.items %}
-                            <li class="list-group-item bg-secondary text-white">
+                            {% set delivered = item.status in (item_status_enum.SERVED, item_status_enum.PAID) %}
+                            {% set locked = item.status == item_status_enum.PAID %}
+                            <li
+                                class="list-group-item text-white js-mobile-item {% if delivered %}mobile-line-served{% else %}mobile-line-pending{% endif %} {% if locked %}mobile-line-locked{% endif %}"
+                                data-toggle-url="{{ url_for('mobile.toggle_item_served', order_id=selected_order.id, item_id=item.id) }}"
+                                data-disabled="{{ 'true' if locked else 'false' }}"
+                                role="button"
+                                aria-pressed="{{ 'true' if delivered else 'false' }}"
+                            >
                                 <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
                                     <div>
                                         <strong>{{ item.product.name }}</strong>
                                         <div class="text-white-50">€ {{ '%.2f'|format(item.unit_price) }} · Total € {{ '%.2f'|format(item.line_total()) }}</div>
+                                        <small class="badge bg-dark-subtle text-uppercase text-dark px-2 py-1">{{ 'Entregat' if delivered else 'Pendent portar' }}</small>
                                     </div>
                                     <form class="d-flex gap-2 align-items-center" method="post" action="{{ url_for('mobile.update_item', order_id=selected_order.id, item_id=item.id) }}">
                                         <button class="btn btn-soft-danger btn-sm" type="submit" name="change" value="decrement" aria-label="Restar">-</button>
@@ -147,6 +156,32 @@ document.querySelectorAll('.js-minus').forEach((btn) => {
 });
 qtyInputs.forEach((input) => input.addEventListener('input', updateTotal));
 updateTotal();
+
+const deliveryRows = document.querySelectorAll('.js-mobile-item');
+function isInteractiveElement(target) {
+    return Boolean(target.closest('form, button, input')); 
+}
+deliveryRows.forEach((row) => {
+    row.addEventListener('click', (event) => {
+        if (isInteractiveElement(event.target)) {
+            return;
+        }
+        if (row.dataset.disabled === 'true') {
+            return;
+        }
+        const url = row.dataset.toggleUrl;
+        if (!url) {
+            return;
+        }
+        row.classList.toggle('mobile-line-served');
+        row.classList.toggle('mobile-line-pending');
+        fetch(url, {
+            method: 'POST',
+            headers: {'X-Requested-With': 'XMLHttpRequest'},
+            credentials: 'same-origin',
+        }).finally(() => window.location.reload());
+    });
+});
 </script>
 {% endif %}
 <script>

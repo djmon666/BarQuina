@@ -5,7 +5,16 @@ from collections import defaultdict
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 
 from ...extensions import db
-from ...models import FulfillmentStatus, Order, OrderItem, PaymentStatus, Product, StaffUser, Table
+from ...models import (
+    FulfillmentStatus,
+    Order,
+    OrderItem,
+    OrderItemStatus,
+    PaymentStatus,
+    Product,
+    StaffUser,
+    Table,
+)
 from ...realtime import emit_order_update
 
 bp = Blueprint("mobile", __name__, url_prefix="/mobile")
@@ -72,11 +81,11 @@ def tables():
     if not user:
         return redirect(url_for("mobile.landing"))
 
-    tables = Table.query.order_by(Table.name).all()
+    table_list = Table.query.order_by(Table.name).all()
     return render_template(
         "mobile/tables.html",
         user=user,
-        tables=tables,
+        tables=table_list,
         fulfillment_status=FulfillmentStatus,
         payment_status=PaymentStatus,
     )
@@ -116,6 +125,7 @@ def table_orders(table_id: int):
         product_groups=product_groups,
         fulfillment_status=FulfillmentStatus,
         payment_status=PaymentStatus,
+        item_status_enum=OrderItemStatus,
     )
 
 
@@ -222,4 +232,35 @@ def update_item(order_id: int, item_id: int):
     order.recalc_status()
     db.session.commit()
     emit_order_update(order)
+    return redirect(url_for("mobile.table_orders", table_id=order.table_id, order_id=order.id))
+
+
+@bp.route("/orders/<int:order_id>/items/<int:item_id>/toggle-served", methods=["POST"])
+def toggle_item_served(order_id: int, item_id: int):
+    user = _require_user()
+    if not user:
+        return redirect(url_for("mobile.landing"))
+
+    order = Order.query.get_or_404(order_id)
+    item = OrderItem.query.get_or_404(item_id)
+    if item.order_id != order.id:
+        flash("La línia no pertany a aquesta comanda", "danger")
+        return redirect(url_for("mobile.table_orders", table_id=order.table_id, order_id=order.id))
+
+    if item.status == OrderItemStatus.PAID:
+        flash("Aquesta línia ja està cobrada", "info")
+        return redirect(url_for("mobile.table_orders", table_id=order.table_id, order_id=order.id))
+
+    next_status = OrderItemStatus.SERVED if item.status != OrderItemStatus.SERVED else OrderItemStatus.PENDING
+    if next_status == OrderItemStatus.SERVED and item.payment_links:
+        item.status = OrderItemStatus.PAID
+    else:
+        item.status = next_status
+    order.recalc_status()
+    db.session.commit()
+    emit_order_update(order)
+
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return ("", 204)
+
     return redirect(url_for("mobile.table_orders", table_id=order.table_id, order_id=order.id))

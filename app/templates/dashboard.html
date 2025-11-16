@@ -39,15 +39,15 @@
         <a class="card text-decoration-none" href="{{ url_for('orders.table_detail', table_id=table.id) }}">
             <div class="card-body">
                 <h5>{{ table.name }}</h5>
-                {% set active_orders = table.orders|selectattr('payment_status', 'ne', payment_status_enum.PAID)|list %}
+                {% set active_orders = table.orders|rejectattr('is_closed')|list %}
                 {% set order = active_orders[-1] if active_orders else None %}
                 {% if order %}
                     <div class="d-flex flex-wrap gap-2 mb-2">
                         <span class="badge {% if order.fulfillment_status == fulfillment_status_enum.SERVED %}bg-success{% else %}bg-danger{% endif %}">
-                            Servei: {{ order.fulfillment_status.value }}
+                            Servei: {{ order.fulfillment_status.label }}
                         </span>
                         <span class="badge {% if order.payment_status == payment_status_enum.PAID %}bg-success{% else %}bg-warning text-dark{% endif %}">
-                            Pagament: {{ order.payment_status.value }}
+                            Pagament: {{ order.payment_status.label }}
                         </span>
                     </div>
                     <p class="mb-0">Total: € {{ '%.2f'|format(order.subtotal()) }}</p>
@@ -79,12 +79,51 @@
         {% set row_class = 'order-row-served' if delivered else 'order-row-pending' %}
         <tr class="js-order-row {{ row_class }}" data-href="{{ url_for('orders.table_detail', table_id=order.table_id, order_id=order.id) }}" role="button" tabindex="0">
             <td>{{ order.table.name }}</td>
-            <td>{{ order.fulfillment_status.value }}</td>
-            <td>{{ order.payment_status.value }}</td>
+            <td>{{ order.fulfillment_status.label }}</td>
+            <td>{{ order.payment_status.label }}</td>
             <td>{{ order.items|length }}</td>
             <td>€ {{ '%.2f'|format(order.subtotal()) }}</td>
             <td>€ {{ '%.2f'|format(order.outstanding_total()) }}</td>
         </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+
+<h2 class="mt-5">Comandes tancades recents</h2>
+<div class="table-responsive">
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Taula</th>
+            <th>Servei</th>
+            <th>Pagament</th>
+            <th>Total</th>
+            <th>Tancada</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for order in closed_orders %}
+        <tr>
+            <td>{{ order.table.name }}</td>
+            <td>{{ order.fulfillment_status.label }}</td>
+            <td>{{ order.payment_status.label }}</td>
+            <td>€ {{ '%.2f'|format(order.subtotal()) }}</td>
+            <td>{{ order.updated_at.strftime('%d/%m %H:%M') if order.updated_at else '-' }}</td>
+            <td class="text-end">
+                <div class="d-flex gap-2 justify-content-end">
+                    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('orders.table_detail', table_id=order.table_id, order_id=order.id) }}">Veure</a>
+                    <form method="post" action="{{ url_for('orders.update_order_status', order_id=order.id) }}">
+                        <input type="hidden" name="fulfillment_status" value="{{ fulfillment_status_enum.PENDING_DELIVERY.value }}">
+                        <input type="hidden" name="payment_status" value="{{ payment_status_enum.PENDING_PAYMENT.value }}">
+                        <button class="btn btn-sm btn-outline-primary" type="submit">Reobrir</button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted">No hi ha comandes tancades recents.</td></tr>
         {% endfor %}
     </tbody>
 </table>

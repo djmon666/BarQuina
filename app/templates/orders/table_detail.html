@@ -19,13 +19,13 @@
                         <form method="post" action="{{ url_for('orders.update_order_status', order_id=order.id) }}" class="m-0">
                             <input type="hidden" name="fulfillment_status" value="{{ next_fulfillment }}">
                             <button type="submit" class="badge border-0 {% if order.fulfillment_status.value == 'servida' %}bg-success{% else %}bg-danger{% endif %} status-toggle" title="Clica per alternar l'estat de servei">
-                                Servei: {{ order.fulfillment_status.value }}
+                                Servei: {{ order.fulfillment_status.label }}
                             </button>
                         </form>
                         <form method="post" action="{{ url_for('orders.update_order_status', order_id=order.id) }}" class="m-0">
                             <input type="hidden" name="payment_status" value="{{ next_payment }}">
                             <button type="submit" class="badge border-0 {% if order.payment_status.value == 'cobrada' %}bg-success{% else %}bg-warning text-dark{% endif %} status-toggle" title="Clica per alternar l'estat de pagament">
-                                Pagament: {{ order.payment_status.value }}
+                                Pagament: {{ order.payment_status.label }}
                             </button>
                         </form>
                     </div>
@@ -43,7 +43,6 @@
                             <th class="d-none"></th>
                             <th>Producte</th>
                             <th>Quantitat</th>
-                            <th>Estat</th>
                             <th>Total</th>
                         </tr>
                     </thead>
@@ -58,21 +57,14 @@
                                     data-price="{{ item.line_total() }}"
                                     value="{{ item.id }}"
                                     form="splitPayment"
-                                    {% if item.status.value=='cobrada' %}disabled{% endif %}
+                                    {% if item.payment_links|length %}disabled{% endif %}
                                 >
                             </td>
-                            <td>{{ item.product.name }}</td>
-                            <td>{{ item.quantity }}</td>
-                            <td class="js-no-selection">
-                                <form method="post" action="{{ url_for('orders.update_item_status', order_id=order.id, item_id=item.id) }}" class="d-flex gap-2">
-                                    <select class="form-select form-select-sm" name="status">
-                                        {% for status in item_statuses %}
-                                        <option value="{{ status.value }}" {% if item.status == status %}selected{% endif %}>{{ status.value }}</option>
-                                        {% endfor %}
-                                    </select>
-                                    <button class="btn btn-sm btn-outline-secondary">✔</button>
-                                </form>
+                            <td>
+                                {{ item.product.name }}
+                                <small class="text-muted d-block">Estat línia: {{ item.status.label }}</small>
                             </td>
+                            <td>{{ item.quantity }}</td>
                             <td>€ {{ '%.2f'|format(item.line_total()) }}</td>
                         </tr>
                     {% endfor %}
@@ -130,6 +122,39 @@
                     <div class="form-floating mb-3">
                         <input class="form-control" name="note" placeholder="Client 1">
                         <label>Nota</label>
+                    </div>
+                    {% set cash_values = [50, 20, 10, 5, 2, 1, 0.5] %}
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label mb-0">Efectiu rebut</label>
+                            <small class="text-muted">Indica el nombre de bitllets o monedes</small>
+                        </div>
+                        <div class="row g-2" id="cashCounter">
+                            {% for value in cash_values %}
+                            {% set input_id = 'cashInput' ~ loop.index0 %}
+                            <div class="col-6 col-md-4">
+                                <div class="border rounded p-2 h-100 bg-light-subtle">
+                                    <div class="text-center mb-2">
+                                        <span class="badge text-dark bg-light w-100">€ {{ '%.2f'|format(value) }}</span>
+                                    </div>
+                                    <div class="btn-group w-100" role="group" aria-label="Controls € {{ '%.2f'|format(value) }}">
+                                        <button class="btn btn-soft-danger btn-sm js-cash-minus" type="button" data-target="{{ input_id }}">-</button>
+                                        <span class="flex-grow-1 text-center js-cash-count" data-display-for="{{ input_id }}">0</span>
+                                        <button class="btn btn-soft-success btn-sm js-cash-plus" type="button" data-target="{{ input_id }}">+</button>
+                                    </div>
+                                </div>
+                                <input type="hidden" class="js-cash-input" name="cash_{{ ('%.2f'|format(value)).replace('.', '_') }}" value="0" id="{{ input_id }}" data-value="{{ '%.2f'|format(value) }}">
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between small text-muted">
+                        <span>Total efectiu</span>
+                        <strong id="cashTotal">€ 0.00</strong>
+                    </div>
+                    <div class="d-flex justify-content-between small text-muted mb-3">
+                        <span>Canvi a tornar</span>
+                        <strong id="cashChange">€ 0.00</strong>
                     </div>
                     <p>Subtotal seleccionat: <strong id="selectedTotal">€ 0.00</strong></p>
                     <button class="btn btn-success" type="submit">Registrar</button>
@@ -189,8 +214,42 @@
 const checkboxes = Array.from(document.querySelectorAll('.js-item'));
 const output = document.getElementById('selectedTotal');
 const selectAllButton = document.getElementById('selectAllItems');
+const cashInputs = Array.from(document.querySelectorAll('.js-cash-input'));
+const cashTotalOutput = document.getElementById('cashTotal');
+const cashChangeOutput = document.getElementById('cashChange');
+let selectedTotalValue = 0;
 
 const enabledCheckboxes = () => checkboxes.filter((cb) => !cb.disabled);
+
+function updateCashSummary() {
+    if (!cashInputs.length) return;
+    let tendered = 0;
+    cashInputs.forEach((input) => {
+        const quantity = parseInt(input.value || '0', 10);
+        if (!quantity) return;
+        tendered += quantity * parseFloat(input.dataset.value || '0');
+    });
+    if (cashTotalOutput) {
+        cashTotalOutput.textContent = `€ ${tendered.toFixed(2)}`;
+    }
+    if (cashChangeOutput) {
+        const change = Math.max(tendered - selectedTotalValue, 0);
+        cashChangeOutput.textContent = `€ ${change.toFixed(2)}`;
+    }
+}
+
+function adjustCashValue(targetId, delta) {
+    const input = document.getElementById(targetId);
+    if (!input) return;
+    const current = parseInt(input.value || '0', 10);
+    const next = Math.max(current + delta, 0);
+    input.value = next;
+    const display = document.querySelector(`[data-display-for="${targetId}"]`);
+    if (display) {
+        display.textContent = String(next);
+    }
+    updateCashSummary();
+}
 
 function updateSubtotal() {
     let total = 0;
@@ -199,9 +258,11 @@ function updateSubtotal() {
             total += parseFloat(cb.dataset.price);
         }
     });
+    selectedTotalValue = total;
     if (output) {
         output.textContent = `€ ${total.toFixed(2)}`;
     }
+    updateCashSummary();
     refreshSelectAllLabel();
 }
 function syncRowState(cb) {
@@ -271,7 +332,15 @@ if (selectAllButton) {
     });
 }
 
+document.querySelectorAll('.js-cash-plus').forEach((btn) => {
+    btn.addEventListener('click', () => adjustCashValue(btn.dataset.target, 1));
+});
+document.querySelectorAll('.js-cash-minus').forEach((btn) => {
+    btn.addEventListener('click', () => adjustCashValue(btn.dataset.target, -1));
+});
+
 updateSubtotal();
+updateCashSummary();
 </script>
 {% if order %}
 <script>

@@ -10,16 +10,28 @@ class FulfillmentStatus(str, Enum):
     PENDING_DELIVERY = "pendent_portar"
     SERVED = "servida"
 
+    @property
+    def label(self) -> str:
+        return self.value.replace("_", " ")
+
 
 class PaymentStatus(str, Enum):
     PENDING_PAYMENT = "pendent_cobrar"
     PAID = "cobrada"
+
+    @property
+    def label(self) -> str:
+        return self.value.replace("_", " ")
 
 
 class OrderItemStatus(str, Enum):
     PENDING = "pendent"
     SERVED = "servida"
     PAID = "cobrada"
+
+    @property
+    def label(self) -> str:
+        return self.value.replace("_", " ")
 
 
 class PaymentMethod(str, Enum):
@@ -117,7 +129,8 @@ class Order(db.Model):
         return max(self.subtotal() - self.paid_total(), 0.0)
 
     def recalc_status(self) -> None:
-        if self.items and all(item.status == OrderItemStatus.SERVED for item in self.items):
+        served_like_statuses = {OrderItemStatus.SERVED, OrderItemStatus.PAID}
+        if self.items and all(item.status in served_like_statuses for item in self.items):
             self.fulfillment_status = FulfillmentStatus.SERVED
         else:
             self.fulfillment_status = FulfillmentStatus.PENDING_DELIVERY
@@ -135,6 +148,14 @@ class Order(db.Model):
             self.status = status
         else:
             self.status = status.value
+
+    @property
+    def is_closed(self) -> bool:
+        return self.fulfillment_status == FulfillmentStatus.SERVED and self.payment_status == PaymentStatus.PAID
+
+    @property
+    def is_open(self) -> bool:
+        return not self.is_closed
 
 
 class OrderItem(db.Model):

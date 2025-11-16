@@ -225,14 +225,25 @@ def add_payment(order_id: int):
     if not selected_items:
         flash("La selecció no és vàlida", "danger")
         return redirect(url_for("orders.table_detail", table_id=order.table_id))
-    amount = sum(item.line_total() for item in selected_items)
+
+    unpaid_items = [item for item in selected_items if not item.payment_links]
+    if not unpaid_items:
+        flash("Les línies seleccionades ja estan cobrades", "warning")
+        return redirect(url_for("orders.table_detail", table_id=order.table_id))
+
+    ignored = len(selected_items) - len(unpaid_items)
+    if ignored:
+        flash("Algunes línies seleccionades ja estaven cobrades i s'han omès", "info")
+
+    amount = sum(item.line_total() for item in unpaid_items)
 
     payment = Payment(order_id=order.id, amount=amount, method=PaymentMethod(method), note=note)
     db.session.add(payment)
     db.session.flush()
 
-    for item in selected_items:
-        item.status = OrderItemStatus.PAID
+    for item in unpaid_items:
+        if item.status == OrderItemStatus.SERVED:
+            item.status = OrderItemStatus.PAID
         db.session.add(PaymentItem(payment_id=payment.id, order_item_id=item.id))
 
     order.recalc_status()

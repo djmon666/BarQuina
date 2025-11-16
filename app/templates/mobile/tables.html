@@ -6,9 +6,9 @@
     <div class="col-6 col-md-4">
         <a class="card bg-secondary text-white text-center p-3 text-decoration-none" href="{{ url_for('mobile.table_orders', table_id=table.id) }}">
             <div class="fs-3">{{ table.name }}</div>
-            {% set active_orders = table.orders|selectattr('payment_status', 'ne', payment_status.PAID)|list %}
+            {% set active_orders = table.orders|selectattr('fulfillment_status', 'ne', fulfillment_status.SERVED)|list %}
             {% if active_orders %}
-                <span class="badge bg-warning text-dark mt-2">{{ active_orders|length }} comanda{% if active_orders|length > 1 %}s{% endif %}</span>
+                <span class="badge bg-warning text-dark mt-2">{{ active_orders|length }}{% if active_orders|length > 1 %} comandes {%else%} comanda{% endif %}</span>
             {% else %}
                 <span class="badge bg-success mt-2">Lliure</span>
             {% endif %}

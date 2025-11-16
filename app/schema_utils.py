@@ -23,20 +23,23 @@ def ensure_legacy_schema() -> None:
         column_names = {column["name"] for column in inspector.get_columns("orders")}
 
     statements: list[str] = []
+    added_columns = False
     if "fulfillment_status" not in column_names:
         statements.append(
             f"ALTER TABLE orders ADD COLUMN fulfillment_status VARCHAR(32) NOT NULL DEFAULT '{FulfillmentStatus.PENDING_DELIVERY.name}'"
         )
+        added_columns = True
     if "payment_status" not in column_names:
         statements.append(
             f"ALTER TABLE orders ADD COLUMN payment_status VARCHAR(32) NOT NULL DEFAULT '{PaymentStatus.PENDING_PAYMENT.name}'"
         )
+        added_columns = True
 
     if statements:
         _apply_ddl(statements)
         column_names.update({"fulfillment_status", "payment_status"})
 
-    if "status" in column_names:
+    if "status" in column_names and added_columns:
         _backfill_from_legacy_status()
 
     if {"fulfillment_status", "payment_status"}.issubset(column_names):

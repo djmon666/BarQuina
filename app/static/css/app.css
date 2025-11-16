@@ -45,10 +45,6 @@ body {
 .table-clickable tbody tr {
     cursor: pointer;
 }
-.table-clickable tbody tr .js-no-selection,
-.table-clickable tbody tr .js-no-selection * {
-    cursor: default;
-}
 .order-row-pending {
     background-color: #fbe2e2 !important;
 }
@@ -79,4 +75,24 @@ body {
 }
 .mobile-order-card small {
     color: rgba(255, 255, 255, 0.85);
+}
+.mobile-line-pending,
+.mobile-line-served {
+    background-color: #3b3b46;
+    border: 0;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border 0.2s ease;
+}
+.mobile-line-pending:hover {
+    background-color: #4a4a56;
+}
+.mobile-line-served {
+    background-color: #1f5a34;
+}
+.mobile-line-served:hover {
+    background-color: #287a46;
+}
+.mobile-line-locked {
+    cursor: not-allowed;
+    opacity: 0.6;
 }
