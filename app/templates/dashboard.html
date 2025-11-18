@@ -66,6 +66,7 @@
     <thead>
         <tr>
             <th>Taula</th>
+            <th>Numero de comanda</th>
             <th>Servei</th>
             <th>Pagament</th>
             <th>Articles</th>
@@ -79,6 +80,7 @@
         {% set row_class = 'order-row-served' if delivered else 'order-row-pending' %}
         <tr class="js-order-row {{ row_class }}" data-href="{{ url_for('orders.table_detail', table_id=order.table_id, order_id=order.id) }}" role="button" tabindex="0">
             <td>{{ order.table.name }}</td>
+            <td>{{ order.id }}</td>
             <td>{{ order.fulfillment_status.label }}</td>
             <td>{{ order.payment_status.label }}</td>
             <td>{{ order.items|length }}</td>

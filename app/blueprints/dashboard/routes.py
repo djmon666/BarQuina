@@ -18,7 +18,7 @@ def home():
                 Order.payment_status != PaymentStatus.PAID,
             )
         )
-        .order_by(Order.created_at.desc())
+        .order_by(Order.created_at.asc())
         .all()
     )
     closed_orders = (
