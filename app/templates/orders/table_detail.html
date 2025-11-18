@@ -62,6 +62,13 @@
                             </td>
                             <td>
                                 {{ item.product.name }}
+                                {% if item.extras %}
+                                <div class="mt-1">
+                                    {% for extra in item.extras %}
+                                    <div class="text-muted small">+ {{ extra.label }} (x{{ extra.quantity }}) · € {{ '%.2f'|format(extra.total()) }}</div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
                                 <small class="text-muted d-block">Estat línia: {{ item.status.label }}</small>
                             </td>
                             <td>{{ item.quantity }}</td>
@@ -183,16 +190,34 @@
                     <div class="mb-4">
                         <h5>{{ category|title }}</h5>
                         {% for product in products %}
-                        <div class="d-flex align-items-center mb-2 gap-2">
-                            <div class="flex-grow-1">
-                                <div>{{ product.name }}</div>
-                                <small class="text-muted">€ {{ '%.2f'|format(product.price) }}</small>
+                        <div class="mb-3 p-2 border rounded">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="flex-grow-1">
+                                    <div>{{ product.name }}</div>
+                                    <small class="text-muted">€ {{ '%.2f'|format(product.price) }}</small>
+                                </div>
+                                <div class="btn-group" role="group">
+                                    <button class="btn btn-soft-danger btn-sm js-minus" type="button" data-target="modalQty{{ product.id }}">-</button>
+                                    <input class="form-control form-control-sm text-center js-qty" name="quantity_{{ product.id }}" id="modalQty{{ product.id }}" type="number" min="0" value="0" data-price="{{ product.price }}" style="width:70px;">
+                                    <button class="btn btn-soft-success btn-sm js-plus" type="button" data-target="modalQty{{ product.id }}">+</button>
+                                </div>
                             </div>
-                            <div class="btn-group" role="group">
-                                <button class="btn btn-soft-danger btn-sm js-minus" type="button" data-target="modalQty{{ product.id }}">-</button>
-                                <input class="form-control form-control-sm text-center js-qty" name="quantity_{{ product.id }}" id="modalQty{{ product.id }}" type="number" min="0" value="0" data-price="{{ product.price }}" style="width:70px;">
-                                <button class="btn btn-soft-success btn-sm js-plus" type="button" data-target="modalQty{{ product.id }}">+</button>
+                            {% if product.product_extras %}
+                            <div class="mt-2">
+                                <div class="small text-muted mb-1">Extres</div>
+                                <div class="row g-2">
+                                    {% for link in product.product_extras if link.extra.is_active %}
+                                        <div class="col-12 col-md-6">
+                                        <label class="form-label small mb-1 d-flex justify-content-between">
+                                            <span>{{ link.extra.name }}</span>
+                                            <span>+€ {{ '%.2f'|format(link.extra.price_delta) }}</span>
+                                        </label>
+                                            <input class="form-control form-control-sm js-extra" type="number" min="0" value="0" name="extra_{{ product.id }}_{{ link.extra.id }}" data-extra-price="{{ link.extra.price_delta }}">
+                                    </div>
+                                    {% endfor %}
+                                </div>
                             </div>
+                            {% endif %}
                         </div>
                         {% endfor %}
                     </div>
@@ -345,6 +370,7 @@ updateCashSummary();
 {% if order %}
 <script>
 const modalQtyInputs = document.querySelectorAll('#productPickerModal .js-qty');
+const modalExtraInputs = document.querySelectorAll('#productPickerModal .js-extra');
 const modalTotalOutput = document.getElementById('modalSelectionTotal');
 function modalUpdateTotal() {
     let total = 0;
@@ -352,6 +378,12 @@ function modalUpdateTotal() {
         const count = parseInt(input.value || '0', 10);
         if (count > 0) {
             total += count * parseFloat(input.dataset.price);
+        }
+    });
+    modalExtraInputs.forEach((input) => {
+        const count = parseInt(input.value || '0', 10);
+        if (count > 0) {
+            total += count * parseFloat(input.dataset.extraPrice || '0');
         }
     });
     if (modalTotalOutput) {
@@ -373,6 +405,7 @@ document.querySelectorAll('#productPickerModal .js-minus').forEach((btn) => {
     btn.addEventListener('click', () => modalAdjustValue(btn.dataset.target, -1));
 });
 modalQtyInputs.forEach((input) => input.addEventListener('input', modalUpdateTotal));
+modalExtraInputs.forEach((input) => input.addEventListener('input', modalUpdateTotal));
 modalUpdateTotal();
 </script>
 {% endif %}

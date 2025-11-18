@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Gestió d'extres</h1>
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card mb-3">
+            <div class="card-header">Nou extra</div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('catalog.extras') }}">
+                    <input type="hidden" name="action" value="create">
+                    <div class="form-floating mb-3">
+                        <input class="form-control" name="name" placeholder="Formatge">
+                        <label>Nom</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <input class="form-control" name="price" type="number" min="0" step="0.01" value="0.50">
+                        <label>Preu extra (€)</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <input class="form-control" name="description" placeholder="Opcional">
+                        <label>Descripció (opcional)</label>
+                    </div>
+                    <button class="btn btn-primary w-100" type="submit">Crear</button>
+                </form>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">Extres disponibles</div>
+            <div class="list-group list-group-flush">
+                {% for extra in extras %}
+                <form method="post" action="{{ url_for('catalog.extras') }}" class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <div>{{ extra.name }}</div>
+                        <small class="text-muted">+€ {{ '%.2f'|format(extra.price_delta) }}</small>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <span class="badge {% if extra.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                            {% if extra.is_active %}Actiu{% else %}Inactiu{% endif %}
+                        </span>
+                        <input type="hidden" name="action" value="toggle">
+                        <input type="hidden" name="extra_id" value="{{ extra.id }}">
+                        <button class="btn btn-outline-secondary btn-sm" type="submit">Alterna</button>
+                    </div>
+                </form>
+                {% else %}
+                <div class="list-group-item">Encara no hi ha extres.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">Assignació per producte</div>
+            <div class="card-body">
+                <p class="text-muted">Selecciona quins extres estan disponibles per a cada producte.</p>
+                <div class="accordion" id="productExtrasAccordion">
+                    {% for product in products %}
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="heading{{ product.id }}">
+                            <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ product.id }}">
+                                {{ product.name }} · {{ product.category|title }}
+                            </button>
+                        </h2>
+                        <div id="collapse{{ product.id }}" class="accordion-collapse collapse {% if loop.first %}show{% endif %}" data-bs-parent="#productExtrasAccordion">
+                            <div class="accordion-body">
+                                <form method="post" action="{{ url_for('catalog.extras') }}">
+                                    <input type="hidden" name="action" value="assign">
+                                    <input type="hidden" name="product_id" value="{{ product.id }}">
+                                    <div class="row g-2">
+                                        {% set assigned = product.product_extras | map(attribute='extra_id') | list %}
+                                        {% for extra in extras %}
+                                        <div class="col-12 col-md-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="extra_ids" value="{{ extra.id }}" id="prod{{ product.id }}extra{{ extra.id }}" {% if extra.id in assigned %}checked{% endif %} {% if not extra.is_active %}disabled{% endif %}>
+                                                <label class="form-check-label" for="prod{{ product.id }}extra{{ extra.id }}">
+                                                    {{ extra.name }} <small class="text-muted">(+€ {{ '%.2f'|format(extra.price_delta) }})</small>
+                                                    {% if not extra.is_active %}<span class="badge bg-secondary ms-2">Inactiu</span>{% endif %}
+                                                </label>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    <button class="btn btn-outline-primary btn-sm mt-3" type="submit">Desar canvis</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No hi ha productes per configurar.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

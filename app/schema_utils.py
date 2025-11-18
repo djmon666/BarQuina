@@ -14,6 +14,7 @@ LEGACY_PAID_VALUES: set[str] = {"cobrada", "paid"}
 
 def ensure_legacy_schema() -> None:
     """Add new columns to legacy databases when missing."""
+    db.create_all()
     engine = db.engine
 
     with engine.connect() as connection:

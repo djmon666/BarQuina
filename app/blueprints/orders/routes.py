@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from sqlalchemy.orm import joinedload
 
 from ...extensions import db
 from ...models import (
@@ -18,6 +19,7 @@ from ...models import (
     Table,
 )
 from ...realtime import emit_order_update
+from ...extras_utils import apply_extras_to_item, collect_extra_counts
 
 bp = Blueprint("orders", __name__, url_prefix="")
 
@@ -36,11 +38,24 @@ def _get_or_create_open_order(table: Table) -> Order:
 
 
 def _grouped_products() -> dict[str, list[Product]]:
-    products = Product.query.filter_by(is_active=True).order_by(Product.category, Product.name).all()
+    products = (
+        Product.query.filter_by(is_active=True)
+        .options(joinedload(Product.product_extras))
+        .order_by(Product.category, Product.name)
+        .all()
+    )
     groups: dict[str, list[Product]] = defaultdict(list)
     for product in products:
         groups[product.category].append(product)
     return groups
+
+
+def _product_with_extras(product_id: int) -> Product | None:
+    return (
+        Product.query.options(joinedload(Product.product_extras))
+        .filter_by(id=product_id, is_active=True)
+        .first()
+    )
 
 
 @bp.route("/tables", methods=["GET", "POST"])
@@ -107,11 +122,12 @@ def add_item(order_id: int):
     quantity = max(int(request.form.get("quantity", 1)), 1)
     notes = request.form.get("notes", "")
 
-    product = Product.query.get(product_id)
+    product = _product_with_extras(product_id)
     if not product:
         flash("Producte inexistent", "danger")
         return redirect(url_for("orders.table_detail", table_id=order.table_id))
 
+    extra_counts = collect_extra_counts(request.form, product)
     item = OrderItem(
         order_id=order.id,
         product_id=product.id,
@@ -120,6 +136,8 @@ def add_item(order_id: int):
         notes=notes,
     )
     db.session.add(item)
+    db.session.flush()
+    apply_extras_to_item(item, extra_counts, product)
     order.fulfillment_status = FulfillmentStatus.PENDING_DELIVERY
     order.payment_status = PaymentStatus.PENDING_PAYMENT
     order.sync_legacy_status()
@@ -145,18 +163,20 @@ def add_items_bulk(order_id: int):
         if quantity <= 0:
             continue
 
-        product = Product.query.get(product_id)
+        product = _product_with_extras(product_id)
         if not product:
             continue
 
-        db.session.add(
-            OrderItem(
-                order_id=order.id,
-                product_id=product.id,
-                quantity=quantity,
-                unit_price=product.price,
-            )
+        extra_counts = collect_extra_counts(request.form, product)
+        order_item = OrderItem(
+            order_id=order.id,
+            product_id=product.id,
+            quantity=quantity,
+            unit_price=product.price,
         )
+        db.session.add(order_item)
+        db.session.flush()
+        apply_extras_to_item(order_item, extra_counts, product)
         added_items += quantity
 
     if added_items:

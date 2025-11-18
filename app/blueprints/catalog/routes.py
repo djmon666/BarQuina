@@ -3,7 +3,7 @@ from __future__ import annotations
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from ...extensions import db
-from ...models import InventoryEntry, Product
+from ...models import Extra, InventoryEntry, Product, ProductExtra
 
 bp = Blueprint("catalog", __name__)
 
@@ -54,3 +54,42 @@ def inventory():
 
     entries = InventoryEntry.query.order_by(InventoryEntry.purchased_at.desc()).limit(50).all()
     return render_template("catalog/inventory.html", entries=entries)
+
+
+@bp.route("/extras", methods=["GET", "POST"])
+def extras():
+    if request.method == "POST":
+        action = request.form.get("action")
+        if action == "create":
+            name = request.form.get("name", "").strip()
+            price = request.form.get("price", type=float) or 0.0
+            description = request.form.get("description", "").strip()
+            if not name or price < 0:
+                flash("Nom i preu vàlids són obligatoris", "danger")
+            else:
+                db.session.add(Extra(name=name, price_delta=price, description=description))
+                db.session.commit()
+                flash("Extra creat", "success")
+        elif action == "toggle":
+            extra_id = request.form.get("extra_id", type=int)
+            extra = Extra.query.get_or_404(extra_id)
+            extra.is_active = not extra.is_active
+            db.session.commit()
+            flash("Estat de l'extra actualitzat", "info")
+        elif action == "assign":
+            product_id = request.form.get("product_id", type=int)
+            product = Product.query.get_or_404(product_id)
+            selected_ids: set[int] = set()
+            for value in request.form.getlist("extra_ids"):
+                try:
+                    selected_ids.add(int(value))
+                except (TypeError, ValueError):
+                    continue
+            product.product_extras = [ProductExtra(product_id=product.id, extra_id=extra_id) for extra_id in selected_ids]
+            db.session.commit()
+            flash("Extres actualitzats", "success")
+        return redirect(url_for("catalog.extras"))
+
+    extras_list = Extra.query.order_by(Extra.name).all()
+    products = Product.query.order_by(Product.category, Product.name).all()
+    return render_template("catalog/extras.html", extras=extras_list, products=products)

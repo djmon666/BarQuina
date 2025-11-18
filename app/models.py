@@ -69,6 +69,19 @@ class Product(db.Model):
     is_active = db.Column(db.Boolean, default=True)
 
     order_items = db.relationship("OrderItem", back_populates="product")
+    product_extras = db.relationship(
+        "ProductExtra",
+        back_populates="product",
+        cascade="all, delete-orphan",
+        lazy="joined",
+    )
+    extras = db.relationship(
+        "Extra",
+        secondary="product_extras",
+        viewonly=True,
+        lazy="joined",
+        order_by="Extra.name",
+    )
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"Product({self.name})"
@@ -172,9 +185,12 @@ class OrderItem(db.Model):
     order = db.relationship("Order", back_populates="items")
     product = db.relationship("Product", back_populates="order_items")
     payment_links = db.relationship("PaymentItem", back_populates="order_item", cascade="all, delete-orphan")
+    extras = db.relationship("OrderItemExtra", back_populates="order_item", cascade="all, delete-orphan")
 
     def line_total(self) -> float:
-        return round(self.quantity * self.unit_price, 2)
+        base_total = self.quantity * self.unit_price
+        extras_total = sum(extra.price_delta * extra.quantity for extra in self.extras)
+        return round(base_total + extras_total, 2)
 
 
 class Payment(db.Model):
@@ -226,3 +242,47 @@ class CashMovement(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     session = db.relationship("CashSession", back_populates="movements")
+
+
+class Extra(db.Model):
+    __tablename__ = "extras"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False, unique=True)
+    price_delta = db.Column(db.Float, nullable=False, default=0.0)
+    is_active = db.Column(db.Boolean, default=True)
+    description = db.Column(db.String(160))
+
+    product_links = db.relationship("ProductExtra", back_populates="extra", cascade="all, delete-orphan")
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"Extra({self.name}, +{self.price_delta})"
+
+
+class ProductExtra(db.Model):
+    __tablename__ = "product_extras"
+
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id", ondelete="CASCADE"), primary_key=True)
+    extra_id = db.Column(db.Integer, db.ForeignKey("extras.id", ondelete="CASCADE"), primary_key=True)
+    is_default = db.Column(db.Boolean, default=False)
+    max_quantity = db.Column(db.Integer)
+
+    product = db.relationship("Product", back_populates="product_extras")
+    extra = db.relationship("Extra", back_populates="product_links", lazy="joined")
+
+
+class OrderItemExtra(db.Model):
+    __tablename__ = "order_item_extras"
+
+    id = db.Column(db.Integer, primary_key=True)
+    order_item_id = db.Column(db.Integer, db.ForeignKey("order_items.id"), nullable=False)
+    extra_id = db.Column(db.Integer, db.ForeignKey("extras.id", ondelete="SET NULL"))
+    label = db.Column(db.String(80), nullable=False)
+    price_delta = db.Column(db.Float, nullable=False)
+    quantity = db.Column(db.Integer, nullable=False, default=1)
+
+    order_item = db.relationship("OrderItem", back_populates="extras")
+    extra = db.relationship("Extra")
+
+    def total(self) -> float:
+        return round(self.price_delta * self.quantity, 2)

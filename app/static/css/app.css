@@ -96,3 +96,16 @@ body {
     cursor: not-allowed;
     opacity: 0.6;
 }
+
+.mobile-extra-toggle {
+    border-color: rgba(255, 255, 255, 0.4);
+    color: #fff;
+    background-color: transparent;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.mobile-extra-toggle.mobile-extra-selected {
+    background-color: #f0b429;
+    color: #1c1c1c;
+    border-color: #f0b429;
+}

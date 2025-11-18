@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+from sqlalchemy.orm import joinedload
 
 from ...extensions import db
 from ...models import (
@@ -16,6 +17,7 @@ from ...models import (
     Table,
 )
 from ...realtime import emit_order_update
+from ...extras_utils import apply_extras_to_item, collect_extra_counts
 
 bp = Blueprint("mobile", __name__, url_prefix="/mobile")
 
@@ -111,7 +113,12 @@ def table_orders(table_id: int):
 
     product_groups: dict[str, list[Product]] | None = None
     if selected_order:
-        products = Product.query.filter_by(is_active=True).order_by(Product.category, Product.name).all()
+        products = (
+            Product.query.filter_by(is_active=True)
+            .options(joinedload(Product.product_extras))
+            .order_by(Product.category, Product.name)
+            .all()
+        )
         product_groups = defaultdict(list)
         for product in products:
             product_groups[product.category].append(product)
@@ -169,18 +176,24 @@ def add_items(order_id: int):
         if quantity <= 0:
             continue
 
-        product = Product.query.get(product_id)
+        product = (
+            Product.query.options(joinedload(Product.product_extras))
+            .filter_by(id=product_id, is_active=True)
+            .first()
+        )
         if not product or not product.is_active:
             continue
 
-        db.session.add(
-            OrderItem(
-                order_id=order.id,
-                product_id=product.id,
-                quantity=quantity,
-                unit_price=product.price,
-            )
+        order_item = OrderItem(
+            order_id=order.id,
+            product_id=product.id,
+            quantity=quantity,
+            unit_price=product.price,
         )
+        db.session.add(order_item)
+        db.session.flush()
+        extra_counts = collect_extra_counts(request.form, product)
+        apply_extras_to_item(order_item, extra_counts, product)
         added_items += quantity
 
     if added_items:
