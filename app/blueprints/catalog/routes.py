@@ -7,13 +7,41 @@ from ...models import Extra, InventoryEntry, Product, ProductExtra
 
 bp = Blueprint("catalog", __name__)
 
+PRODUCT_CATEGORIES = ("Menjar", "Beure", "Aperitius", "Altres")
+
+
+def _normalize_category(raw_value: str | None) -> str:
+    """Return a safe category name limited to the predefined segments."""
+    if not raw_value:
+        return PRODUCT_CATEGORIES[0]
+    cleaned = raw_value.strip()
+    if not cleaned:
+        return PRODUCT_CATEGORIES[0]
+    lower_value = cleaned.lower()
+    for allowed in PRODUCT_CATEGORIES:
+        if lower_value == allowed.lower():
+            return allowed
+    # Basic aliases to absorb older values or typos without failing the UI
+    alias_map = {
+        "beguda": "Beure",
+        "begudes": "Beure",
+        "menjar": "Menjar",
+        "aperitiu": "Aperitius",
+        "altres": "Altres",
+    }
+    return alias_map.get(lower_value, PRODUCT_CATEGORIES[0])
+
 
 @bp.route("/products", methods=["GET", "POST"])
 def products():
     if request.method == "POST":
         name = request.form.get("name", "").strip()
-        category = request.form.get("category", "").strip() or "beguda"
-        price = float(request.form.get("price", 0))
+        category = _normalize_category(request.form.get("category"))
+        price_raw = request.form.get("price")
+        try:
+            price = float(price_raw)
+        except (TypeError, ValueError):
+            price = 0.0
         if not name or price <= 0:
             flash("Nom i preu són obligatoris", "danger")
         else:
@@ -23,7 +51,31 @@ def products():
         return redirect(url_for("catalog.products"))
 
     products = Product.query.order_by(Product.category, Product.name).all()
-    return render_template("catalog/products.html", products=products)
+    return render_template("catalog/products.html", products=products, categories=PRODUCT_CATEGORIES)
+
+
+@bp.route("/products/<int:product_id>/update", methods=["POST"])
+def update_product(product_id: int):
+    product = Product.query.get_or_404(product_id)
+    name = request.form.get("name", "").strip()
+    price_raw = request.form.get("price")
+    category = _normalize_category(request.form.get("category"))
+
+    try:
+        price = float(price_raw)
+    except (TypeError, ValueError):
+        price = 0.0
+
+    if not name or price <= 0:
+        flash("Nom i preu vàlids són obligatoris", "danger")
+    else:
+        product.name = name
+        product.category = category
+        product.price = price
+        db.session.commit()
+        flash("Producte actualitzat", "success")
+
+    return redirect(url_for("catalog.products"))
 
 
 @bp.route("/products/<int:product_id>/toggle", methods=["POST"])
