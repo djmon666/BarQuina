@@ -110,18 +110,36 @@
                                             <div class="small text-white-50 mb-1">Extres</div>
                                             {% for link in product.product_extras if link.extra.is_active %}
                                                 {% set field_id = 'extra' ~ product.id ~ '_' ~ link.extra.id %}
-                                                <input type="hidden" class="js-extra" id="{{ field_id }}" name="extra_{{ product.id }}_{{ link.extra.id }}" value="0" data-extra-price="{{ link.extra.price_delta }}">
-                                                <button type="button" class="btn btn-outline-light btn-sm w-100 mb-2 mobile-extra-toggle js-extra-toggle" data-input-id="{{ field_id }}" aria-pressed="false">
-                                                    <span>{{ link.extra.name }}</span>
-                                                    <small class="text-white-50 ms-2">+€ {{ '%.2f'|format(link.extra.price_delta) }}</small>
-                                                </button>
+                                                <input
+                                                    type="hidden"
+                                                    class="js-extra"
+                                                    id="{{ field_id }}"
+                                                    name="extra_{{ product.id }}_{{ link.extra.id }}"
+                                                    value="0"
+                                                    data-extra-price="{{ link.extra.price_delta }}"
+                                                >
+                                                <div class="mobile-extra-line js-extra-counter"
+                                                    data-input-id="{{ field_id }}"
+                                                    data-qty-target="qty{{ product.id }}"
+                                                    data-product-id="{{ product.id }}"
+                                                >
+                                                    <div>
+                                                        <div class="fw-semibold">{{ link.extra.name }}</div>
+                                                        <small class="text-white-50">+€ {{ '%.2f'|format(link.extra.price_delta) }}</small>
+                                                    </div>
+                                                    <div class="mobile-extra-counter">
+                                                        <button type="button" class="btn btn-soft-danger btn-sm" data-delta="-1" aria-label="Restar extra">-</button>
+                                                        <span class="mobile-extra-count js-extra-count" aria-live="polite">0</span>
+                                                        <button type="button" class="btn btn-soft-success btn-sm" data-delta="1" aria-label="Sumar extra">+</button>
+                                                    </div>
+                                                </div>
                                             {% endfor %}
                                         </div>
                                         {% endif %}
                                     </div>
                                     <div class="btn-group" role="group" aria-label="Controls {{ product.id }}">
                                         <button class="btn btn-soft-danger btn-sm js-minus" type="button" data-target="qty{{ product.id }}">-</button>
-                                        <input class="form-control form-control-sm text-center js-qty" name="quantity_{{ product.id }}" id="qty{{ product.id }}" type="number" min="0" value="0" data-price="{{ product.price }}" style="width:70px;">
+                                        <input class="form-control form-control-sm text-center js-qty" name="quantity_{{ product.id }}" id="qty{{ product.id }}" type="number" min="0" value="0" data-price="{{ product.price }}" data-product-id="{{ product.id }}" style="width:70px;">
                                         <button class="btn btn-soft-success btn-sm js-plus" type="button" data-target="qty{{ product.id }}">+</button>
                                     </div>
                                 </div>
@@ -150,7 +168,7 @@
 <script>
 const qtyInputs = document.querySelectorAll('.js-qty');
 const extraInputs = document.querySelectorAll('#quickAdd .js-extra');
-const extraToggleButtons = document.querySelectorAll('#quickAdd .js-extra-toggle');
+const extraControls = document.querySelectorAll('#quickAdd .js-extra-counter');
 const totalOutput = document.getElementById('selectionTotal');
 function updateTotal() {
     let total = 0;
@@ -168,22 +186,71 @@ function updateTotal() {
     });
     totalOutput.textContent = `€ ${total.toFixed(2)}`;
 }
-function syncExtraButton(button) {
-    const hiddenInput = document.getElementById(button.dataset.inputId || '');
-    if (!hiddenInput) return;
-    const isActive = hiddenInput.value === '1';
-    button.classList.toggle('mobile-extra-selected', isActive);
-    button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+function getMaxExtraCount(control) {
+    const qtyTarget = control.dataset.qtyTarget;
+    if (!qtyTarget) return null;
+    const qtyInput = document.getElementById(qtyTarget);
+    if (!qtyInput) return null;
+    const qty = parseInt(qtyInput.value || '0', 10);
+    if (Number.isNaN(qty)) {
+        return 0;
+    }
+    return Math.max(qty, 0);
 }
-
-function toggleExtra(button) {
-    const inputId = button.dataset.inputId;
-    if (!inputId) return;
-    const hiddenInput = document.getElementById(inputId);
+function syncExtraControl(control) {
+    const hiddenInput = document.getElementById(control.dataset.inputId || '');
     if (!hiddenInput) return;
-    const next = hiddenInput.value === '1' ? '0' : '1';
-    hiddenInput.value = next;
-    syncExtraButton(button);
+    const count = parseInt(hiddenInput.value || '0', 10) || 0;
+    const maxCount = getMaxExtraCount(control);
+    const display = control.querySelector('.js-extra-count');
+    if (display) {
+        display.textContent = String(count);
+    }
+    const minus = control.querySelector('button[data-delta="-1"]');
+    const plus = control.querySelector('button[data-delta="1"]');
+    if (minus) {
+        minus.disabled = count <= 0;
+    }
+    if (plus) {
+        plus.disabled = maxCount !== null && count >= maxCount;
+    }
+    control.classList.toggle('mobile-extra-active', count > 0);
+}
+function clampExtraControl(control) {
+    const hiddenInput = document.getElementById(control.dataset.inputId || '');
+    if (!hiddenInput) return;
+    const count = parseInt(hiddenInput.value || '0', 10) || 0;
+    const maxCount = getMaxExtraCount(control);
+    if (maxCount === null) {
+        syncExtraControl(control);
+        return;
+    }
+    const clamped = Math.min(Math.max(count, 0), maxCount);
+    if (clamped !== count) {
+        hiddenInput.value = String(clamped);
+    }
+    syncExtraControl(control);
+}
+function clampExtrasForProduct(productId) {
+    if (!productId) return;
+    extraControls.forEach((control) => {
+        if (control.dataset.productId === String(productId)) {
+            clampExtraControl(control);
+        }
+    });
+}
+function adjustExtra(control, delta) {
+    const hiddenInput = document.getElementById(control.dataset.inputId || '');
+    if (!hiddenInput) return;
+    const maxCount = getMaxExtraCount(control);
+    const current = parseInt(hiddenInput.value || '0', 10) || 0;
+    let next = current + delta;
+    if (maxCount !== null) {
+        next = Math.min(next, maxCount);
+    }
+    next = Math.max(next, 0);
+    hiddenInput.value = String(next);
+    syncExtraControl(control);
     updateTotal();
 }
 function adjustValue(targetId, delta) {
@@ -192,6 +259,11 @@ function adjustValue(targetId, delta) {
     const current = parseInt(input.value || '0', 10);
     const next = Math.max(current + delta, 0);
     input.value = next;
+    handleQtyChange(input);
+}
+function handleQtyChange(input) {
+    const productId = input.dataset.productId;
+    clampExtrasForProduct(productId);
     updateTotal();
 }
 document.querySelectorAll('.js-plus').forEach((btn) => {
@@ -200,10 +272,13 @@ document.querySelectorAll('.js-plus').forEach((btn) => {
 document.querySelectorAll('.js-minus').forEach((btn) => {
     btn.addEventListener('click', () => adjustValue(btn.dataset.target, -1));
 });
-qtyInputs.forEach((input) => input.addEventListener('input', updateTotal));
-extraToggleButtons.forEach((btn) => {
-    btn.addEventListener('click', () => toggleExtra(btn));
-    syncExtraButton(btn);
+qtyInputs.forEach((input) => input.addEventListener('input', () => handleQtyChange(input)));
+extraControls.forEach((control) => {
+    control.querySelectorAll('button[data-delta]').forEach((button) => {
+        const delta = parseInt(button.dataset.delta || '0', 10) || 0;
+        button.addEventListener('click', () => adjustExtra(control, delta));
+    });
+    clampExtraControl(control);
 });
 extraInputs.forEach((input) => input.addEventListener('input', updateTotal));
 updateTotal();
