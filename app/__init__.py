@@ -21,6 +21,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     from .blueprints.cash.routes import bp as cash_bp
     from .blueprints.users.routes import bp as users_bp
     from .blueprints.mobile.routes import bp as mobile_bp
+    from .blueprints.kitchen.routes import bp as kitchen_bp
 
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(catalog_bp, url_prefix="/catalog")
@@ -28,6 +29,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     app.register_blueprint(cash_bp, url_prefix="/cash")
     app.register_blueprint(users_bp)
     app.register_blueprint(mobile_bp)
+    app.register_blueprint(kitchen_bp)
 
     @app.cli.command("seed-demo")
     def seed_demo() -> None:

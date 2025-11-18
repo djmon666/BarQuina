@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+        <h1 class="mb-0">Control de cuina</h1>
+        <p class="text-muted mb-0">{{ total_pending_items }} línia{% if total_pending_items != 1 %}s{% endif %} pendents</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" href="/">← Tornar al quadre</a>
+    </div>
+</div>
+
+{% if pending_orders %}
+<div class="row g-3">
+    {% for order, items in pending_orders %}
+    <div class="col-12 col-lg-6">
+        <div class="card kitchen-ticket">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="fw-bold">Taula {{ order.table.name }}</div>
+                    <small class="text-muted">Entrada {{ order.created_at.strftime('%H:%M') }}</small>
+                </div>
+                <span class="badge text-bg-dark-emphasis kitchen-order-badge">#{{ order.id }}</span>
+                <form method="post" action="{{ url_for('kitchen.mark_order_ready', order_id=order.id) }}">
+                    <button class="btn btn-sm btn-outline-success" type="submit">Tot servit</button>
+                </form>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled mb-0">
+                    {% for item in items %}
+                    <li class="kitchen-line d-flex justify-content-between gap-3 align-items-start">
+                        <div>
+                            <div class="fw-semibold">{{ item.quantity }}× {{ item.product.name }}</div>
+                            {% if item.extras %}
+                            <ul class="list-unstyled small text-muted mb-1">
+                                {% for extra in item.extras %}
+                                <li>+ {{ extra.label }} (x{{ extra.quantity }})</li>
+                                {% endfor %}
+                            </ul>
+                            {% endif %}
+                            {% if item.notes %}
+                            <div class="badge bg-warning-subtle text-dark">Nota: {{ item.notes }}</div>
+                            {% endif %}
+                        </div>
+                        <form method="post" action="{{ url_for('kitchen.mark_item_ready', order_id=order.id, item_id=item.id) }}">
+                            <button class="btn btn-success btn-sm">Servit</button>
+                        </form>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-success">No hi ha comandes pendents a cuina ara mateix 🎉</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+if (window.barquinaRealtime) {
+    window.barquinaRealtime.onOrderUpdate(() => {
+        window.location.reload();
+    });
+}
+</script>
+{% endblock %}

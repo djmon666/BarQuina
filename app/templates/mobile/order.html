@@ -57,9 +57,10 @@
                         <ul class="list-group list-group-flush">
                         {% for item in selected_order.items %}
                             {% set delivered = item.status in (item_status_enum.SERVED, item_status_enum.PAID) %}
+                            {% set ready = item.status == item_status_enum.PREPARED %}
                             {% set locked = item.status == item_status_enum.PAID %}
                             <li
-                                class="list-group-item text-white js-mobile-item {% if delivered %}mobile-line-served{% else %}mobile-line-pending{% endif %} {% if locked %}mobile-line-locked{% endif %}"
+                                class="list-group-item text-white js-mobile-item {% if delivered %}mobile-line-served{% elif ready %}mobile-line-ready{% else %}mobile-line-pending{% endif %} {% if locked %}mobile-line-locked{% endif %}"
                                 data-toggle-url="{{ url_for('mobile.toggle_item_served', order_id=selected_order.id, item_id=item.id) }}"
                                 data-disabled="{{ 'true' if locked else 'false' }}"
                                 role="button"
@@ -76,7 +77,15 @@
                                         </ul>
                                         {% endif %}
                                         <div class="text-white-50">€ {{ '%.2f'|format(item.unit_price) }} · Total € {{ '%.2f'|format(item.line_total()) }}</div>
-                                        <small class="badge bg-dark-subtle text-uppercase text-dark px-2 py-1">{{ 'Entregat' if delivered else 'Pendent portar' }}</small>
+                                        <small class="badge bg-dark-subtle text-uppercase text-dark px-2 py-1">
+                                            {% if delivered %}
+                                                Entregat
+                                            {% elif ready %}
+                                                Preparat
+                                            {% else %}
+                                                Per preparar
+                                            {% endif %}
+                                        </small>
                                     </div>
                                     <form class="d-flex gap-2 align-items-center" method="post" action="{{ url_for('mobile.update_item', order_id=selected_order.id, item_id=item.id) }}">
                                         <button class="btn btn-soft-danger btn-sm" type="submit" name="change" value="decrement" aria-label="Restar">-</button>

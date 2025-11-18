@@ -26,12 +26,17 @@ class PaymentStatus(str, Enum):
 
 class OrderItemStatus(str, Enum):
     PENDING = "pendent"
+    PREPARED = "preparat"
     SERVED = "servida"
     PAID = "cobrada"
 
     @property
     def label(self) -> str:
-        return self.value.replace("_", " ")
+        custom = {
+            OrderItemStatus.PENDING: "Per preparar",
+            OrderItemStatus.PREPARED: "Preparat",
+        }
+        return custom.get(self, self.value.replace("_", " "))
 
 
 class PaymentMethod(str, Enum):

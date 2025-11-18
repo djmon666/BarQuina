@@ -26,7 +26,7 @@ def _current_user() -> StaffUser | None:
     user_id = session.get("mobile_user_id")
     if not user_id:
         return None
-    return StaffUser.query.get(user_id)
+    return db.session.get(StaffUser, user_id)
 
 
 def _require_user() -> StaffUser | None:
@@ -58,7 +58,7 @@ def landing():
 @bp.route("/select-user", methods=["POST"])
 def select_user():
     user_id = request.form.get("user_id", type=int)
-    user = StaffUser.query.get(user_id)
+    user = db.session.get(StaffUser, user_id) if user_id else None
     if not user or not user.is_active:
         flash("Usuari invàlid", "danger")
         return redirect(url_for("mobile.landing"))
@@ -264,7 +264,13 @@ def toggle_item_served(order_id: int, item_id: int):
         flash("Aquesta línia ja està cobrada", "info")
         return redirect(url_for("mobile.table_orders", table_id=order.table_id, order_id=order.id))
 
-    next_status = OrderItemStatus.SERVED if item.status != OrderItemStatus.SERVED else OrderItemStatus.PENDING
+    if item.status == OrderItemStatus.SERVED:
+        next_status = OrderItemStatus.PREPARED
+    elif item.status == OrderItemStatus.PREPARED:
+        next_status = OrderItemStatus.SERVED
+    else:
+        next_status = OrderItemStatus.SERVED
+
     if next_status == OrderItemStatus.SERVED and item.payment_links:
         item.status = OrderItemStatus.PAID
     else:
