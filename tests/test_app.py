@@ -14,7 +14,20 @@ pytestmark = pytest.mark.filterwarnings("ignore:.*LegacyAPIWarning.*")
 from app import create_app
 from app.config import Config
 from app.extensions import db
-from app.models import Extra, Order, OrderItem, OrderItemExtra, OrderItemStatus, Product, ProductExtra, StaffUser, Table
+from typing import Any
+
+from app.models import (
+    Category,
+    Extra,
+    Order,
+    OrderItem,
+    OrderItemExtra,
+    OrderItemStatus,
+    Product,
+    ProductExtra,
+    StaffUser,
+    Table,
+)
 
 
 class TestConfig(Config):
@@ -38,6 +51,20 @@ def client(tmp_path):
         db.drop_all()
 
 
+def _get_category(name: str, **defaults: Any) -> Category:
+    category = Category.query.filter_by(name=name).first()
+    if category:
+        for key, value in defaults.items():
+            setattr(category, key, value)
+        db.session.flush([category])
+        return category
+
+    category = Category(name=name, **defaults)
+    db.session.add(category)
+    db.session.flush([category])
+    return category
+
+
 def test_homepage_loads(client):
     response = client.get("/")
     assert response.status_code == 200
@@ -53,7 +80,8 @@ def test_mobile_page_loads(client):
 def test_order_item_with_extras_affects_subtotal(client):
     with client.application.app_context():
         table = Table(name="Test", seats=4)
-        product = Product(name="Entrepas", category="menjar", price=4.0)
+        category = _get_category("Menjar", sort_order=10)
+        product = Product(name="Entrepas", price=4.0, category=category)
         extra = Extra(name="Formatge", price_delta=0.5)
         db.session.add_all([table, product, extra])
         db.session.flush()
@@ -82,7 +110,8 @@ def test_kitchen_page_loads(client):
 def test_kitchen_mark_item_ready(client):
     with client.application.app_context():
         table = Table(name="Cuina", seats=4)
-        product = Product(name="Entrepas", category="Menjar", price=6.0)
+        category = _get_category("Menjar", sort_order=10)
+        product = Product(name="Entrepas", price=6.0, category=category)
         db.session.add_all([table, product])
         db.session.flush()
         order = Order(table_id=table.id)
@@ -107,7 +136,8 @@ def test_mobile_toggle_served_cycle(client):
     with client.application.app_context():
         staff = StaffUser(name="Mobile", is_active=True)
         table = Table(name="Taula 1", seats=4)
-        product = Product(name="Cafe", category="Beure", price=2.0)
+        category = _get_category("Begudes", sort_order=5, auto_prepare=True)
+        product = Product(name="Cafe", price=2.0, category=category)
         db.session.add_all([staff, table, product])
         db.session.flush()
         order = Order(table_id=table.id, created_by=staff)
@@ -144,3 +174,16 @@ def test_mobile_toggle_served_cycle(client):
     with client.application.app_context():
         reverted = db.session.get(OrderItem, item_id)
         assert reverted.status == OrderItemStatus.PREPARED
+
+
+def test_product_initial_status_respects_category_flag(client):
+    with client.application.app_context():
+        auto_category = _get_category("Begudes", sort_order=5, auto_prepare=True)
+        manual_category = _get_category("Menjar", sort_order=10, auto_prepare=False)
+        auto_product = Product(name="Refresc", price=2.0, category=auto_category)
+        manual_product = Product(name="Entrepas", price=5.0, category=manual_category)
+        db.session.add_all([auto_category, manual_category, auto_product, manual_product])
+        db.session.flush()
+
+        assert auto_product.initial_item_status() == OrderItemStatus.PREPARED
+        assert manual_product.initial_item_status() == OrderItemStatus.PENDING

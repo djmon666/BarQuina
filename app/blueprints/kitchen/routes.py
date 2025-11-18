@@ -65,7 +65,7 @@ def mark_item_ready(order_id: int, item_id: int):
     order.recalc_status()
     db.session.commit()
     emit_order_update(order)
-    flash(f"'{item.product.name}' marcat com servit", "success")
+    flash(f"'{item.product.name}' marcat com preparat", "success")
     return redirect(url_for("kitchen.queue"))
 
 
@@ -89,5 +89,5 @@ def mark_order_ready(order_id: int):
     order.recalc_status()
     db.session.commit()
     emit_order_update(order)
-    flash(f"{len(pending_items)} línies marcades com servides", "success")
+    flash(f"{len(pending_items)} línies marcades com preparades", "success")
     return redirect(url_for("kitchen.queue"))

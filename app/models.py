@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 
+from sqlalchemy.orm import validates
+
 from .extensions import db
 
 
@@ -64,12 +66,28 @@ class Table(db.Model):
         return f"Table({self.name})"
 
 
+class Category(db.Model):
+    __tablename__ = "categories"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(60), unique=True, nullable=False)
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    auto_prepare = db.Column(db.Boolean, nullable=False, default=False)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+
+    products = db.relationship("Product", back_populates="category")
+
+    def __repr__(self) -> str:  # pragma: no cover - repr helper
+        return f"Category({self.name})"
+
+
 class Product(db.Model):
     __tablename__ = "products"
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(80), nullable=False)
-    category = db.Column(db.String(30), nullable=False, default="beguda")
+    legacy_category = db.Column("category", db.String(30))
+    category_id = db.Column(db.Integer, db.ForeignKey("categories.id"), nullable=False)
     price = db.Column(db.Float, nullable=False)
     is_active = db.Column(db.Boolean, default=True)
 
@@ -87,6 +105,27 @@ class Product(db.Model):
         lazy="joined",
         order_by="Extra.name",
     )
+
+    category = db.relationship("Category", back_populates="products", lazy="joined")
+
+    @property
+    def category_name(self) -> str:
+        if self.category:
+            return self.category.name
+        return self.legacy_category or ""
+
+    @property
+    def is_auto_prepared(self) -> bool:
+        return bool(self.category and self.category.auto_prepare)
+
+    def initial_item_status(self) -> OrderItemStatus:
+        return OrderItemStatus.PREPARED if self.is_auto_prepared else OrderItemStatus.PENDING
+
+    @validates("category")
+    def _sync_legacy_category(self, key: str, category: Category | None) -> Category | None:
+        if category and category.name:
+            self.legacy_category = category.name
+        return category
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"Product({self.name})"

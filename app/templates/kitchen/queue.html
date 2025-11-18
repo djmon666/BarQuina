@@ -22,7 +22,7 @@
                 </div>
                 <span class="badge text-bg-dark-emphasis kitchen-order-badge">#{{ order.id }}</span>
                 <form method="post" action="{{ url_for('kitchen.mark_order_ready', order_id=order.id) }}">
-                    <button class="btn btn-sm btn-outline-success" type="submit">Tot servit</button>
+                    <button class="btn btn-sm btn-outline-success" type="submit">Tot preparat</button>
                 </form>
             </div>
             <div class="card-body">
@@ -30,7 +30,10 @@
                     {% for item in items %}
                     <li class="kitchen-line d-flex justify-content-between gap-3 align-items-start">
                         <div>
-                            <div class="fw-semibold">{{ item.quantity }}× {{ item.product.name }}</div>
+                            <div class="fw-semibold d-flex flex-column">
+                                <span>{{ item.quantity }}× {{ item.product.name }}</span>
+                                <span class="badge kitchen-preparing-badge align-self-start mt-1">Per preparar</span>
+                            </div>
                             {% if item.extras %}
                             <ul class="list-unstyled small text-muted mb-1">
                                 {% for extra in item.extras %}
@@ -43,7 +46,7 @@
                             {% endif %}
                         </div>
                         <form method="post" action="{{ url_for('kitchen.mark_item_ready', order_id=order.id, item_id=item.id) }}">
-                            <button class="btn btn-success btn-sm">Servit</button>
+                            <button class="btn btn-success btn-sm">Preparat</button>
                         </form>
                     </li>
                     {% endfor %}

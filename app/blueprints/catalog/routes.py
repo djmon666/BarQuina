@@ -1,57 +1,51 @@
 from __future__ import annotations
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
+from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 
 from ...extensions import db
-from ...models import Extra, InventoryEntry, Product, ProductExtra
+from ...models import Category, Extra, InventoryEntry, Product, ProductExtra
 
 bp = Blueprint("catalog", __name__)
 
-PRODUCT_CATEGORIES = ("Menjar", "Beure", "Aperitius", "Altres")
 
-
-def _normalize_category(raw_value: str | None) -> str:
-    """Return a safe category name limited to the predefined segments."""
-    if not raw_value:
-        return PRODUCT_CATEGORIES[0]
-    cleaned = raw_value.strip()
-    if not cleaned:
-        return PRODUCT_CATEGORIES[0]
-    lower_value = cleaned.lower()
-    for allowed in PRODUCT_CATEGORIES:
-        if lower_value == allowed.lower():
-            return allowed
-    # Basic aliases to absorb older values or typos without failing the UI
-    alias_map = {
-        "beguda": "Beure",
-        "begudes": "Beure",
-        "menjar": "Menjar",
-        "aperitiu": "Aperitius",
-        "altres": "Altres",
-    }
-    return alias_map.get(lower_value, PRODUCT_CATEGORIES[0])
+def _ordered_categories(include_inactive: bool = False) -> list[Category]:
+    query = Category.query
+    if not include_inactive:
+        query = query.filter_by(is_active=True)
+    return query.order_by(Category.sort_order, Category.name).all()
 
 
 @bp.route("/products", methods=["GET", "POST"])
 def products():
+    categories = _ordered_categories()
     if request.method == "POST":
         name = request.form.get("name", "").strip()
-        category = _normalize_category(request.form.get("category"))
         price_raw = request.form.get("price")
+        category_id = request.form.get("category_id", type=int)
+        category = Category.query.get(category_id) if category_id else (categories[0] if categories else None)
         try:
             price = float(price_raw)
         except (TypeError, ValueError):
             price = 0.0
-        if not name or price <= 0:
-            flash("Nom i preu són obligatoris", "danger")
+        if not name or price <= 0 or not category:
+            flash("Nom, preu i categoria són obligatoris", "danger")
         else:
-            db.session.add(Product(name=name, category=category, price=price))
+            product = Product(name=name, price=price, category=category)
+            product.legacy_category = category.name
+            db.session.add(product)
             db.session.commit()
             flash("Producte creat", "success")
         return redirect(url_for("catalog.products"))
 
-    products = Product.query.order_by(Product.category, Product.name).all()
-    return render_template("catalog/products.html", products=products, categories=PRODUCT_CATEGORIES)
+    products = (
+        Product.query.options(joinedload(Product.category))
+        .join(Product.category)
+        .order_by(Category.sort_order, Category.name, Product.name)
+        .all()
+    )
+    return render_template("catalog/products.html", products=products, categories=categories)
 
 
 @bp.route("/products/<int:product_id>/update", methods=["POST"])
@@ -59,18 +53,20 @@ def update_product(product_id: int):
     product = Product.query.get_or_404(product_id)
     name = request.form.get("name", "").strip()
     price_raw = request.form.get("price")
-    category = _normalize_category(request.form.get("category"))
+    category_id = request.form.get("category_id", type=int)
+    category = Category.query.get(category_id)
 
     try:
         price = float(price_raw)
     except (TypeError, ValueError):
         price = 0.0
 
-    if not name or price <= 0:
-        flash("Nom i preu vàlids són obligatoris", "danger")
+    if not name or price <= 0 or not category:
+        flash("Nom, preu i categoria vàlids són obligatoris", "danger")
     else:
         product.name = name
         product.category = category
+        product.legacy_category = category.name
         product.price = price
         db.session.commit()
         flash("Producte actualitzat", "success")
@@ -143,5 +139,56 @@ def extras():
         return redirect(url_for("catalog.extras"))
 
     extras_list = Extra.query.order_by(Extra.name).all()
-    products = Product.query.order_by(Product.category, Product.name).all()
+    products = (
+        Product.query.options(joinedload(Product.category))
+        .join(Product.category)
+        .order_by(Category.sort_order, Category.name, Product.name)
+        .all()
+    )
     return render_template("catalog/extras.html", extras=extras_list, products=products)
+
+
+@bp.route("/categories", methods=["GET", "POST"])
+def categories():
+    if request.method == "POST":
+        action = request.form.get("action", "create")
+        if action == "create":
+            name = request.form.get("name", "").strip()
+            sort_order = request.form.get("sort_order", type=int)
+            auto_prepare = bool(request.form.get("auto_prepare"))
+            if not name:
+                flash("El nom és obligatori", "danger")
+            elif Category.query.filter(func.lower(Category.name) == name.lower()).first():
+                flash("Ja existeix una categoria amb aquest nom", "warning")
+            else:
+                category = Category(
+                    name=name,
+                    sort_order=sort_order or 0,
+                    auto_prepare=auto_prepare,
+                    is_active=True,
+                )
+                db.session.add(category)
+                db.session.commit()
+                flash("Categoria creada", "success")
+        elif action == "update":
+            category_id = request.form.get("category_id", type=int)
+            category = Category.query.get_or_404(category_id)
+            new_name = request.form.get("name", category.name).strip()
+            if new_name and new_name.lower() != category.name.lower():
+                conflict = (
+                    Category.query.filter(func.lower(Category.name) == new_name.lower(), Category.id != category.id)
+                    .first()
+                )
+                if conflict:
+                    flash("Ja existeix una categoria amb aquest nom", "warning")
+                    return redirect(url_for("catalog.categories"))
+                category.name = new_name
+            category.sort_order = request.form.get("sort_order", type=int) or category.sort_order
+            category.auto_prepare = bool(request.form.get("auto_prepare"))
+            category.is_active = bool(request.form.get("is_active", "0"))
+            db.session.commit()
+            flash("Categoria actualitzada", "success")
+        return redirect(url_for("catalog.categories"))
+
+    categories = _ordered_categories(include_inactive=True)
+    return render_template("catalog/categories.html", categories=categories)

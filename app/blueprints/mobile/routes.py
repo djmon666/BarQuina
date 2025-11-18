@@ -7,6 +7,7 @@ from sqlalchemy.orm import joinedload
 
 from ...extensions import db
 from ...models import (
+    Category,
     FulfillmentStatus,
     Order,
     OrderItem,
@@ -111,17 +112,25 @@ def table_orders(table_id: int):
     if not selected_order and orders:
         selected_order = orders[0]
 
-    product_groups: dict[str, list[Product]] | None = None
+    product_groups: list[tuple[Category, list[Product]]] | None = None
     if selected_order:
         products = (
             Product.query.filter_by(is_active=True)
-            .options(joinedload(Product.product_extras))
-            .order_by(Product.category, Product.name)
+            .join(Product.category)
+            .options(joinedload(Product.product_extras), joinedload(Product.category))
+            .order_by(Category.sort_order, Category.name, Product.name)
             .all()
         )
-        product_groups = defaultdict(list)
+        grouped: dict[int, list[Product]] = defaultdict(list)
+        categories: list[Category] = []
         for product in products:
-            product_groups[product.category].append(product)
+            category = product.category
+            if not category or not category.is_active:
+                continue
+            if category.id not in grouped:
+                categories.append(category)
+            grouped[category.id].append(product)
+        product_groups = [(category, grouped[category.id]) for category in categories]
 
     return render_template(
         "mobile/order.html",
@@ -129,7 +138,7 @@ def table_orders(table_id: int):
         table=table,
         orders=orders,
         selected_order=selected_order,
-        product_groups=product_groups,
+        product_groups=product_groups or [],
         fulfillment_status=FulfillmentStatus,
         payment_status=PaymentStatus,
         item_status_enum=OrderItemStatus,
@@ -177,7 +186,7 @@ def add_items(order_id: int):
             continue
 
         product = (
-            Product.query.options(joinedload(Product.product_extras))
+            Product.query.options(joinedload(Product.product_extras), joinedload(Product.category))
             .filter_by(id=product_id, is_active=True)
             .first()
         )
@@ -189,6 +198,7 @@ def add_items(order_id: int):
             product_id=product.id,
             quantity=quantity,
             unit_price=product.price,
+            status=product.initial_item_status(),
         )
         db.session.add(order_item)
         db.session.flush()

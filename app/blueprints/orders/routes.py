@@ -7,6 +7,7 @@ from sqlalchemy.orm import joinedload
 
 from ...extensions import db
 from ...models import (
+    Category,
     FulfillmentStatus,
     Order,
     OrderItem,
@@ -37,22 +38,29 @@ def _get_or_create_open_order(table: Table) -> Order:
     return order
 
 
-def _grouped_products() -> dict[str, list[Product]]:
+def _grouped_products() -> list[tuple[Category, list[Product]]]:
     products = (
         Product.query.filter_by(is_active=True)
-        .options(joinedload(Product.product_extras))
-        .order_by(Product.category, Product.name)
+        .join(Product.category)
+        .options(joinedload(Product.product_extras), joinedload(Product.category))
+        .order_by(Category.sort_order, Category.name, Product.name)
         .all()
     )
-    groups: dict[str, list[Product]] = defaultdict(list)
+    groups: dict[int, list[Product]] = defaultdict(list)
+    ordered_categories: list[Category] = []
     for product in products:
-        groups[product.category].append(product)
-    return groups
+        category = product.category
+        if not category or not category.is_active:
+            continue
+        if category.id not in groups:
+            ordered_categories.append(category)
+        groups[category.id].append(product)
+    return [(category, groups[category.id]) for category in ordered_categories]
 
 
 def _product_with_extras(product_id: int) -> Product | None:
     return (
-        Product.query.options(joinedload(Product.product_extras))
+        Product.query.options(joinedload(Product.product_extras), joinedload(Product.category))
         .filter_by(id=product_id, is_active=True)
         .first()
     )
@@ -133,6 +141,7 @@ def add_item(order_id: int):
         product_id=product.id,
         quantity=quantity,
         unit_price=product.price,
+        status=product.initial_item_status(),
         notes=notes,
     )
     db.session.add(item)
@@ -173,6 +182,7 @@ def add_items_bulk(order_id: int):
             product_id=product.id,
             quantity=quantity,
             unit_price=product.price,
+            status=product.initial_item_status(),
         )
         db.session.add(order_item)
         db.session.flush()

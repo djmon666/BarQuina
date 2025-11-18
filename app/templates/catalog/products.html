@@ -1,8 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>Productes</h1>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newProduct">Nou producte</button>
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h1 class="mb-0">Productes</h1>
+    <div class="btn-group">
+        <a class="btn btn-outline-secondary" href="{{ url_for('catalog.categories') }}">Gestionar categories</a>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newProduct">Nou producte</button>
+    </div>
 </div>
 <div class="table-responsive">
 <table class="table table-striped align-middle">
@@ -19,7 +22,12 @@
         {% for product in products %}
         <tr>
             <td>{{ product.name }}</td>
-            <td>{{ product.category }}</td>
+            <td>
+                <span>{{ product.category.name }}</span>
+                {% if product.category.auto_prepare %}
+                <span class="badge bg-warning text-dark ms-2">Auto</span>
+                {% endif %}
+            </td>
             <td>€ {{ '%.2f'|format(product.price) }}</td>
             <td>
                 {% if product.is_active %}
@@ -37,7 +45,7 @@
                         data-product-id="{{ product.id }}"
                         data-product-name="{{ product.name }}"
                         data-product-price="{{ '%.2f'|format(product.price) }}"
-                        data-product-category="{{ product.category }}"
+                        data-product-category-id="{{ product.category_id }}"
                         data-update-url="{{ url_for('catalog.update_product', product_id=product.id) }}"
                     >Edita</button>
                     <form method="post" action="{{ url_for('catalog.toggle_product', product_id=product.id) }}">
@@ -64,9 +72,9 @@
                         <label>Nom</label>
                     </div>
                     <div class="form-floating mb-3">
-                        <select class="form-select" name="category">
+                        <select class="form-select" name="category_id">
                             {% for category in categories %}
-                            <option value="{{ category }}" {% if loop.first %}selected{% endif %}>{{ category }}</option>
+                            <option value="{{ category.id }}" {% if loop.first %}selected{% endif %}>{{ category.name }}{% if category.auto_prepare %} (auto){% endif %}</option>
                             {% endfor %}
                         </select>
                         <label>Categoria</label>
@@ -96,9 +104,9 @@
                         <label>Nom</label>
                     </div>
                     <div class="form-floating mb-3">
-                        <select class="form-select" name="category" required>
+                        <select class="form-select" name="category_id" required>
                             {% for category in categories %}
-                            <option value="{{ category }}">{{ category }}</option>
+                            <option value="{{ category.id }}">{{ category.name }}{% if category.auto_prepare %} (auto){% endif %}</option>
                             {% endfor %}
                         </select>
                         <label>Categoria</label>
@@ -132,14 +140,13 @@ document.addEventListener("DOMContentLoaded", function () {
         form.action = trigger.getAttribute("data-update-url") || form.action;
         const nameInput = form.querySelector('input[name="name"]');
         const priceInput = form.querySelector('input[name="price"]');
-        const categorySelect = form.querySelector('select[name="category"]');
+        const categorySelect = form.querySelector('select[name="category_id"]');
         nameInput.value = trigger.getAttribute("data-product-name") || "";
         priceInput.value = trigger.getAttribute("data-product-price") || "";
-        const category = trigger.getAttribute("data-product-category") || "";
-        const categoryValue = category.toLowerCase();
+        const categoryId = trigger.getAttribute("data-product-category-id") || "";
         Array.from(categorySelect.options).forEach((option) => {
             const optionValue = option.value || "";
-            if (optionValue === category || optionValue.toLowerCase() === categoryValue) {
+            if (optionValue === categoryId) {
                 option.selected = true;
             } else {
                 option.selected = false;

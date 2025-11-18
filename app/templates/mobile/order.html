@@ -106,9 +106,9 @@
                     <div class="card-header">Afegir productes</div>
                     <div class="card-body">
                         <form method="post" action="{{ url_for('mobile.add_items', order_id=selected_order.id) }}" id="quickAdd">
-                            {% for category, products in product_groups.items() %}
+                            {% for category, products in product_groups %}
                             <div class="mb-3">
-                                <h5>{{ category|title }}</h5>
+                                <h5>{{ category.name }}</h5>
                                 {% for product in products %}
                                 <div class="d-flex align-items-center mb-2 gap-2">
                                     <div class="flex-grow-1">

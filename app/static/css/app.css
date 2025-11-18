@@ -171,6 +171,10 @@ body {
     padding: 0.35rem 0.75rem;
     border-radius: 999px;
 }
+.kitchen-preparing-badge {
+    background-color: #f0b429;
+    color: #0f172a;
+}
 .kitchen-line {
     border-bottom: 1px dashed rgba(15, 23, 42, 0.12);
     padding: 0.75rem 0;

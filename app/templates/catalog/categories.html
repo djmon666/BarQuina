@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h1 class="mb-0">Categories</h1>
+    <a class="btn btn-outline-primary" href="{{ url_for('catalog.products') }}">Torna a productes</a>
+</div>
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">Nova categoria</div>
+            <form method="post" action="{{ url_for('catalog.categories') }}">
+                <input type="hidden" name="action" value="create">
+                <div class="card-body">
+                    <div class="form-floating mb-3">
+                        <input class="form-control" name="name" placeholder="Begudes" required>
+                        <label>Nom</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <input class="form-control" name="sort_order" type="number" value="10">
+                        <label>Ordre</label>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" name="auto_prepare" id="newAuto">
+                        <label class="form-check-label" for="newAuto">Auto preparada</label>
+                    </div>
+                </div>
+                <div class="card-footer text-end">
+                    <button class="btn btn-primary" type="submit">Crear</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">Categories existents</div>
+            <div class="list-group list-group-flush">
+                {% for category in categories %}
+                <form class="list-group-item" method="post" action="{{ url_for('catalog.categories') }}">
+                    <input type="hidden" name="action" value="update">
+                    <input type="hidden" name="category_id" value="{{ category.id }}">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted">Nom</label>
+                            <input class="form-control" name="name" value="{{ category.name }}" required>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small text-muted">Ordre</label>
+                            <input class="form-control" name="sort_order" type="number" value="{{ category.sort_order }}">
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check mt-4">
+                                <input class="form-check-input" type="checkbox" name="auto_prepare" id="auto{{ category.id }}" {% if category.auto_prepare %}checked{% endif %}>
+                                <label class="form-check-label" for="auto{{ category.id }}">Auto preparada</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check mt-4">
+                                <input class="form-check-input" type="checkbox" name="is_active" id="active{{ category.id }}" {% if category.is_active %}checked{% endif %}>
+                                <label class="form-check-label" for="active{{ category.id }}">Visible</label>
+                            </div>
+                        </div>
+                        <div class="col-12 text-end">
+                            <button class="btn btn-outline-primary btn-sm" type="submit">Desar</button>
+                        </div>
+                    </div>
+                </form>
+                {% else %}
+                <div class="list-group-item text-muted">Encara no hi ha categories.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -186,9 +186,9 @@
             </div>
             <div class="modal-body">
                 <form method="post" action="{{ url_for('orders.add_items_bulk', order_id=order.id) }}" id="modalAddForm">
-                    {% for category, products in product_groups.items() %}
+                    {% for category, products in product_groups %}
                     <div class="mb-4">
-                        <h5>{{ category|title }}</h5>
+                        <h5>{{ category.name }}</h5>
                         {% for product in products %}
                         <div class="mb-3 p-2 border rounded">
                             <div class="d-flex align-items-center gap-2">

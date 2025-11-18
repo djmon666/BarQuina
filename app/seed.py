@@ -3,7 +3,7 @@ from __future__ import annotations
 from random import choice, randint
 
 from .extensions import db
-from .models import Extra, Order, OrderItem, OrderItemExtra, Product, ProductExtra, StaffUser, Table
+from .models import Category, Extra, Order, OrderItem, OrderItemExtra, Product, ProductExtra, StaffUser, Table
 
 
 def seed_demo_data() -> None:
@@ -20,12 +20,24 @@ def seed_demo_data() -> None:
     ]
     db.session.add_all(staff)
 
-    products = [
-        Product(name="Cafè", category="beguda", price=1.5),
-        Product(name="Cervesa artesana", category="beguda", price=4.0),
-        Product(name="Entrepà vegetarià", category="menjar", price=6.5),
-        Product(name="Tapa braves", category="menjar", price=5.0),
+    categories = [
+        Category(name="Begudes", sort_order=10, auto_prepare=True, is_active=True),
+        Category(name="Aperitius", sort_order=20, auto_prepare=True, is_active=True),
+        Category(name="Menjar", sort_order=30, auto_prepare=False, is_active=True),
+        Category(name="Altres", sort_order=40, auto_prepare=False, is_active=True),
     ]
+    db.session.add_all(categories)
+    db.session.flush()
+    category_map = {category.name: category for category in categories}
+
+    products = [
+        Product(name="Cafè", price=1.5, category=category_map["Begudes"]),
+        Product(name="Cervesa artesana", price=4.0, category=category_map["Begudes"]),
+        Product(name="Entrepà vegetarià", price=6.5, category=category_map["Menjar"]),
+        Product(name="Tapa braves", price=5.0, category=category_map["Menjar"]),
+    ]
+    for product in products:
+        product.legacy_category = product.category.name
     db.session.add_all(products)
     db.session.flush()
 
@@ -37,7 +49,7 @@ def seed_demo_data() -> None:
     db.session.add_all(extras)
     db.session.flush()
 
-    food_products = [product for product in products if product.category == "menjar"]
+    food_products = [product for product in products if product.category and not product.category.auto_prepare]
     for product in food_products:
         for extra in extras:
             db.session.add(ProductExtra(product_id=product.id, extra_id=extra.id))
@@ -58,6 +70,7 @@ def seed_demo_data() -> None:
                 product_id=product.id,
                 quantity=quantity,
                 unit_price=product.price,
+                status=product.initial_item_status(),
             )
             db.session.add(item)
             db.session.flush()

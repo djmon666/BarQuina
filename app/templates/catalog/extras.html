@@ -58,7 +58,7 @@
                     <div class="accordion-item">
                         <h2 class="accordion-header" id="heading{{ product.id }}">
                             <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ product.id }}">
-                                {{ product.name }} · {{ product.category|title }}
+                                {{ product.name }} · {{ product.category.name }}
                             </button>
                         </h2>
                         <div id="collapse{{ product.id }}" class="accordion-collapse collapse {% if loop.first %}show{% endif %}" data-bs-parent="#productExtrasAccordion">
