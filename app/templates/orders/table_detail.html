@@ -2,36 +2,41 @@
 {% block content %}
 <h1>{{ table.name }}</h1>
 {% set pending_count = pending_orders|length if pending_orders is not none else 0 %}
+{% set global_count = global_open_count if global_open_count is not none else 0 %}
 <div class="alert alert-light border d-flex flex-wrap gap-3 justify-content-between align-items-center">
     <div>
-        <div class="text-muted text-uppercase small mb-0">Comandes pendents</div>
-        <div class="h5 mb-0">{{ pending_count }}</div>
+        <div class="text-muted text-uppercase small mb-0">Comandes obertes · totes les taules</div>
+        <div class="h5 mb-0">{{ global_count }}</div>
+        <small class="text-muted">Taula {{ table.name }}: {{ pending_count }} obertes</small>
     </div>
     <div>
         <div class="text-muted text-uppercase small mb-0">Comanda actual</div>
         <div class="h5 mb-0">
-            {% if pending_position is not none %}
-                {{ pending_position + 1 }} / {{ pending_count }}
-            {% elif pending_count %}
-                – / {{ pending_count }}
+            {% if global_position is not none and global_count %}
+                {{ global_position + 1 }} / {{ global_count }}
+            {% elif global_count %}
+                – / {{ global_count }}
             {% else %}
                 cap pendent
             {% endif %}
         </div>
+        {% if order and order.table %}
+        <small class="text-muted">Taula {{ order.table.name }}</small>
+        {% endif %}
     </div>
-    <div class="btn-group" role="group" aria-label="Navegació comandes pendents">
+    <div class="btn-group" role="group" aria-label="Navegació global de comandes">
         <a
-            class="btn btn-outline-secondary btn-sm {% if not pending_prev_id %}disabled{% endif %}"
-            href="{% if pending_prev_id %}{{ url_for('orders.table_detail', table_id=table.id, order_id=pending_prev_id) }}{% else %}#{% endif %}"
+            class="btn btn-outline-secondary btn-sm {% if not global_prev_order %}disabled{% endif %}"
+            href="{% if global_prev_order %}{{ url_for('orders.table_detail', table_id=global_prev_order.table_id, order_id=global_prev_order.id) }}{% else %}#{% endif %}"
             role="button"
-            {% if not pending_prev_id %}aria-disabled="true" tabindex="-1"{% endif %}
-        >← Anterior</a>
+            {% if not global_prev_order %}aria-disabled="true" tabindex="-1"{% endif %}
+        >← {% if global_prev_order and global_prev_order.table %}Taula {{ global_prev_order.table.name }}{% else %}Anterior{% endif %}</a>
         <a
-            class="btn btn-outline-secondary btn-sm {% if not pending_next_id %}disabled{% endif %}"
-            href="{% if pending_next_id %}{{ url_for('orders.table_detail', table_id=table.id, order_id=pending_next_id) }}{% else %}#{% endif %}"
+            class="btn btn-outline-secondary btn-sm {% if not global_next_order %}disabled{% endif %}"
+            href="{% if global_next_order %}{{ url_for('orders.table_detail', table_id=global_next_order.table_id, order_id=global_next_order.id) }}{% else %}#{% endif %}"
             role="button"
-            {% if not pending_next_id %}aria-disabled="true" tabindex="-1"{% endif %}
-        >Següent →</a>
+            {% if not global_next_order %}aria-disabled="true" tabindex="-1"{% endif %}
+        >{% if global_next_order and global_next_order.table %}Taula {{ global_next_order.table.name }}{% else %}Següent{% endif %} →</a>
     </div>
 </div>
 {% if order %}

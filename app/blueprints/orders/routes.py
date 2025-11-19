@@ -117,6 +117,25 @@ def table_detail(table_id: int):
             if idx < len(pending_orders) - 1:
                 pending_next_id = pending_orders[idx + 1].id
             break
+    global_open_orders = (
+        Order.query.options(joinedload(Order.table))
+        .filter(Order.payment_status != PaymentStatus.PAID)
+        .order_by(Order.created_at.desc())
+        .all()
+    )
+    global_prev_order: Order | None = None
+    global_next_order: Order | None = None
+    global_position: int | None = None
+    if order and global_open_orders:
+        for idx, open_order in enumerate(global_open_orders):
+            if open_order.id != order.id:
+                continue
+            global_position = idx
+            if idx > 0:
+                global_prev_order = global_open_orders[idx - 1]
+            if idx < len(global_open_orders) - 1:
+                global_next_order = global_open_orders[idx + 1]
+            break
     product_groups = _grouped_products()
     return render_template(
         "orders/table_detail.html",
@@ -130,6 +149,10 @@ def table_detail(table_id: int):
         pending_prev_id=pending_prev_id,
         pending_next_id=pending_next_id,
         pending_position=pending_position,
+        global_open_count=len(global_open_orders),
+        global_prev_order=global_prev_order,
+        global_next_order=global_next_order,
+        global_position=global_position,
     )
 
 
