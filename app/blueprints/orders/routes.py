@@ -99,6 +99,24 @@ def table_detail(table_id: int):
             .order_by(Order.created_at.desc())
             .first()
         )
+    pending_orders = (
+        Order.query.filter(Order.table_id == table.id, Order.payment_status != PaymentStatus.PAID)
+        .order_by(Order.created_at.desc())
+        .all()
+    )
+    pending_prev_id: int | None = None
+    pending_next_id: int | None = None
+    pending_position: int | None = None
+    if order and pending_orders:
+        for idx, pending in enumerate(pending_orders):
+            if pending.id != order.id:
+                continue
+            pending_position = idx
+            if idx > 0:
+                pending_prev_id = pending_orders[idx - 1].id
+            if idx < len(pending_orders) - 1:
+                pending_next_id = pending_orders[idx + 1].id
+            break
     product_groups = _grouped_products()
     return render_template(
         "orders/table_detail.html",
@@ -108,6 +126,10 @@ def table_detail(table_id: int):
         fulfillment_statuses=list(FulfillmentStatus),
         payment_statuses=list(PaymentStatus),
         item_statuses=list(OrderItemStatus),
+        pending_orders=pending_orders,
+        pending_prev_id=pending_prev_id,
+        pending_next_id=pending_next_id,
+        pending_position=pending_position,
     )
 
 

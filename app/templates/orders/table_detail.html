@@ -1,6 +1,39 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>{{ table.name }}</h1>
+{% set pending_count = pending_orders|length if pending_orders is not none else 0 %}
+<div class="alert alert-light border d-flex flex-wrap gap-3 justify-content-between align-items-center">
+    <div>
+        <div class="text-muted text-uppercase small mb-0">Comandes pendents</div>
+        <div class="h5 mb-0">{{ pending_count }}</div>
+    </div>
+    <div>
+        <div class="text-muted text-uppercase small mb-0">Comanda actual</div>
+        <div class="h5 mb-0">
+            {% if pending_position is not none %}
+                {{ pending_position + 1 }} / {{ pending_count }}
+            {% elif pending_count %}
+                – / {{ pending_count }}
+            {% else %}
+                cap pendent
+            {% endif %}
+        </div>
+    </div>
+    <div class="btn-group" role="group" aria-label="Navegació comandes pendents">
+        <a
+            class="btn btn-outline-secondary btn-sm {% if not pending_prev_id %}disabled{% endif %}"
+            href="{% if pending_prev_id %}{{ url_for('orders.table_detail', table_id=table.id, order_id=pending_prev_id) }}{% else %}#{% endif %}"
+            role="button"
+            {% if not pending_prev_id %}aria-disabled="true" tabindex="-1"{% endif %}
+        >← Anterior</a>
+        <a
+            class="btn btn-outline-secondary btn-sm {% if not pending_next_id %}disabled{% endif %}"
+            href="{% if pending_next_id %}{{ url_for('orders.table_detail', table_id=table.id, order_id=pending_next_id) }}{% else %}#{% endif %}"
+            role="button"
+            {% if not pending_next_id %}aria-disabled="true" tabindex="-1"{% endif %}
+        >Següent →</a>
+    </div>
+</div>
 {% if order %}
 <div class="row g-4">
     <div class="col-lg-7">
