@@ -106,6 +106,9 @@
                     <div class="card-header">Afegir productes</div>
                     <div class="card-body">
                         <form method="post" action="{{ url_for('mobile.add_items', order_id=selected_order.id) }}" id="quickAdd">
+                            <p class="mt-3">Subtotal seleccionat: <strong id="selectionTotal">€ 0.00</strong></p>
+                            <input type="hidden" name="food_payload" id="foodPayloadField" value="">
+                            <button class="btn btn-success w-100" type="submit">Afegir a la comanda</button>
                             {% for category, products in product_groups %}
                             <div class="mb-3">
                                 <h5>{{ category.name }}</h5>
@@ -201,9 +204,7 @@
                                 {% endfor %}
                             </div>
                             {% endfor %}
-                            <p class="mt-3">Subtotal seleccionat: <strong id="selectionTotal">€ 0.00</strong></p>
-                            <input type="hidden" name="food_payload" id="foodPayloadField" value="">
-                            <button class="btn btn-success w-100" type="submit">Afegir a la comanda</button>
+                           
                         </form>
                     </div>
                 </div>
