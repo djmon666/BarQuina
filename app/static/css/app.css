@@ -103,6 +103,23 @@ body {
     opacity: 0.6;
 }
 
+.mobile-add-lock-message {
+    border-left: 4px solid #f0b429;
+    background-color: rgba(240, 180, 41, 0.1);
+}
+
+.mobile-add-fieldset {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-inline-size: 0;
+}
+
+.mobile-add-fieldset:disabled {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
 .mobile-extra-line {
     border: 1px solid rgba(255, 255, 255, 0.2);
     

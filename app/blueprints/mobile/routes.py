@@ -308,6 +308,7 @@ def toggle_item_served(order_id: int, item_id: int):
         return redirect(url_for("mobile.landing"))
 
     order = Order.query.get_or_404(order_id)
+
     item = OrderItem.query.get_or_404(item_id)
     if item.order_id != order.id:
         flash("La línia no pertany a aquesta comanda", "danger")

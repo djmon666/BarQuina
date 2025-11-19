@@ -24,6 +24,7 @@ from app.models import (
     OrderItem,
     OrderItemExtra,
     OrderItemStatus,
+    PaymentStatus,
     Product,
     ProductExtra,
     StaffUser,
@@ -242,6 +243,62 @@ def test_mobile_stress_orders_and_status_churn(client):
         assert len(refreshed_orders) == 10
         for order in refreshed_orders:
             assert order.items[0].status in {OrderItemStatus.PREPARED, OrderItemStatus.SERVED, OrderItemStatus.PAID}
+
+
+def test_mobile_paid_order_blocks_additions_but_allows_toggle(client):
+    with client.application.app_context():
+        staff = StaffUser(name="Locked", is_active=True)
+        table = Table(name="Taula Tancada", seats=2)
+        category = _get_category("Begudes", sort_order=5)
+        product = Product(name="Refresc", price=2.5, category=category)
+        db.session.add_all([staff, table, product])
+        db.session.flush()
+        order = Order(table_id=table.id, created_by=staff)
+        order.sync_legacy_status()
+        db.session.add(order)
+        db.session.flush()
+        item = OrderItem(
+            order_id=order.id,
+            product_id=product.id,
+            quantity=1,
+            unit_price=product.price,
+            status=OrderItemStatus.PREPARED,
+        )
+        db.session.add(item)
+        order.payment_status = PaymentStatus.PAID
+        db.session.commit()
+        order_id = order.id
+        item_id = item.id
+        product_id = product.id
+        staff_id = staff.id
+        staff_name = staff.name
+
+    _login_mobile_user(client, staff_id, staff_name)
+
+    add_attempt = client.post(
+        f"/mobile/orders/{order_id}/add-items",
+        data={f"quantity_{product_id}": "1"},
+    )
+    assert add_attempt.status_code == 302
+
+    with client.application.app_context():
+        refreshed_order = db.session.get(Order, order_id)
+        assert refreshed_order is not None
+        assert len(refreshed_order.items) == 1
+
+    update_attempt = client.post(
+        f"/mobile/orders/{order_id}/items/{item_id}/update",
+        data={"change": "increment"},
+    )
+    assert update_attempt.status_code == 302
+
+    toggle_attempt = client.post(f"/mobile/orders/{order_id}/items/{item_id}/toggle-served")
+    assert toggle_attempt.status_code == 302
+
+    with client.application.app_context():
+        final_item = db.session.get(OrderItem, item_id)
+        assert final_item.quantity == 1
+        assert final_item.status == OrderItemStatus.SERVED
 
 def test_mobile_add_items_with_food_payload(client):
     with client.application.app_context():
