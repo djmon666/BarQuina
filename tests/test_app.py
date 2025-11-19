@@ -66,6 +66,12 @@ def _get_category(name: str, **defaults: Any) -> Category:
     return category
 
 
+def _login_mobile_user(client, user_id: int, user_name: str) -> None:
+    with client.session_transaction() as session_state:
+        session_state["mobile_user_id"] = user_id
+        session_state["mobile_user_name"] = user_name
+
+
 def test_homepage_loads(client):
     response = client.get("/")
     assert response.status_code == 200
@@ -188,6 +194,54 @@ def test_product_initial_status_respects_category_flag(client):
 
         assert auto_product.initial_item_status() == OrderItemStatus.PREPARED
         assert manual_product.initial_item_status() == OrderItemStatus.PENDING
+
+
+def test_mobile_stress_orders_and_status_churn(client):
+    with client.application.app_context():
+        staff = StaffUser(name="Stress", is_active=True)
+        table = Table(name="Simulacre", seats=6)
+        category = _get_category("Menjar", sort_order=10)
+        product = Product(name="Stress Burger", price=9.5, category=category)
+        db.session.add_all([staff, table, product])
+        db.session.commit()
+        staff_id = staff.id
+        staff_name = staff.name
+        table_id = table.id
+        product_id = product.id
+
+    _login_mobile_user(client, staff_id, staff_name)
+
+    created_order_ids: list[int] = []
+    for _ in range(10):
+        response = client.post(f"/mobile/tables/{table_id}/orders")
+        assert response.status_code == 302
+
+    with client.application.app_context():
+        created_order_ids = [order.id for order in Order.query.order_by(Order.id).all()]
+        assert len(created_order_ids) == 10
+
+    for order_id in created_order_ids:
+        payload = {f"quantity_{product_id}": "1"}
+        resp = client.post(f"/mobile/orders/{order_id}/add-items", data=payload, follow_redirects=False)
+        assert resp.status_code == 302
+
+    with client.application.app_context():
+        order_item_pairs = []
+        for order in Order.query.filter(Order.id.in_(created_order_ids)).all():
+            assert order.items, "Each order should have at least one item after stress add"
+            order_item_pairs.append((order.id, order.items[0].id))
+
+    for order_id, item_id in order_item_pairs:
+        # Rapidly toggle served/prepared states to mimic hectic service flow
+        for _ in range(5):
+            resp = client.post(f"/mobile/orders/{order_id}/items/{item_id}/toggle-served")
+            assert resp.status_code == 302
+
+    with client.application.app_context():
+        refreshed_orders = Order.query.filter(Order.id.in_(created_order_ids)).all()
+        assert len(refreshed_orders) == 10
+        for order in refreshed_orders:
+            assert order.items[0].status in {OrderItemStatus.PREPARED, OrderItemStatus.SERVED, OrderItemStatus.PAID}
 
 def test_mobile_add_items_with_food_payload(client):
     with client.application.app_context():

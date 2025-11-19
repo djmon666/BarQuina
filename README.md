@@ -61,6 +61,24 @@ Amb això podràs desplegar BarQuina en una xarxa sense accés a Internet.
 pytest
 ```
 
+### Simulació de càrrega externa
+
+Per provar el sistema des d'una màquina externa i mesurar latències reals, utilitza `scripts/external_stress.py`. Només cal tenir Python 3 i instal·lar `httpx`:
+
+```bash
+pip install httpx
+python scripts/external_stress.py https://quina.local 3 7 12 20 --concurrency 5 --status-cycles 2
+```
+
+Arguments:
+
+- `base_url`: URL pública del teu servidor.
+- `user_id`: identificador d'un usuari actiu (pots veure'l a la base de dades `staff_users`).
+- `table_id` i `product_id`: registres que ja existeixen.
+- `orders`: nombre total d'escenaris a simular.
+
+El script crearà noves comandes, afegirà productes i alternarà ràpidament l'estat de les línies. Al final mostrarà temps mitjans, p95 i màxims de cada etapa per ajudar-te a detectar colls d'ampolla de xarxa o servidor. Executa'l des d'un portàtil o altra màquina per apropar-te a un escenari realista.
+
 ## Properes passes suggerides
 
 - Afegir autenticació i rols (cambrer, cuina, caixa).
