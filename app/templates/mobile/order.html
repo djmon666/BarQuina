@@ -218,7 +218,6 @@
         {% endif %}
     </div>
 </div>
-{% endblock %}
 <div class="modal fade" id="foodExtrasModal" tabindex="-1" aria-labelledby="foodExtrasModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content bg-dark text-white border border-light-subtle">
@@ -240,6 +239,7 @@
         </div>
     </div>
 </div>
+{% endblock %}
 {% block scripts %}
 {% if selected_order %}
 <script>
@@ -254,7 +254,19 @@ const foodPayloadField = document.getElementById('foodPayloadField');
 const quickAddForm = document.getElementById('quickAdd');
 const foodSelectionWrappers = document.querySelectorAll('.js-food-selection-wrapper');
 const foodModalEl = document.getElementById('foodExtrasModal');
-const foodModal = foodModalEl && window.bootstrap ? new window.bootstrap.Modal(foodModalEl) : null;
+const bootstrapModal = window.bootstrap && window.bootstrap.Modal ? window.bootstrap.Modal : null;
+const getFoodModalInstance = (() => {
+    let modalInstance = null;
+    return () => {
+        if (!foodModalEl || !bootstrapModal) {
+            return null;
+        }
+        if (!modalInstance) {
+            modalInstance = bootstrapModal.getOrCreateInstance(foodModalEl);
+        }
+        return modalInstance;
+    };
+})();
 const foodModalTitle = document.getElementById('foodExtrasModalLabel');
 const foodModalDescription = foodModalEl ? foodModalEl.querySelector('.js-food-modal-description') : null;
 const foodModalOptions = foodModalEl ? foodModalEl.querySelector('.js-food-extra-options') : null;
@@ -467,7 +479,12 @@ extraInputs.forEach((input) => input.addEventListener('input', updateTotal));
 updateFoodPayloadField();
 updateTotal();
 function openFoodModal(productId) {
-    if (!productId || !foodModal) {
+    if (!productId) {
+        return;
+    }
+    const modalInstance = getFoodModalInstance();
+    if (!modalInstance) {
+        addFoodSelection(productId, []);
         return;
     }
     const meta = productMeta.get(productId);
@@ -486,7 +503,7 @@ function openFoodModal(productId) {
     }
     renderFoodModalOptions(meta);
     updateFoodModalConfirmLabel();
-    foodModal.show();
+    modalInstance.show();
 }
 function renderFoodModalOptions(meta) {
     if (!foodModalOptions || !foodModalEmptyHint) {
@@ -546,8 +563,9 @@ function persistFoodSelection() {
         return;
     }
     addFoodSelection(activeFoodProductId, Array.from(activeFoodExtras));
-    if (foodModal) {
-        foodModal.hide();
+    const modalInstance = getFoodModalInstance();
+    if (modalInstance) {
+        modalInstance.hide();
     }
 }
 function addFoodSelection(productId, extras) {
