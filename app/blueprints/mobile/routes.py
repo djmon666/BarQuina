@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections import defaultdict
 
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
@@ -173,6 +174,59 @@ def add_items(order_id: int):
         return redirect(url_for("mobile.table_orders", table_id=order.table_id))
 
     added_items = 0
+    product_cache: dict[int, Product | None] = {}
+
+    def load_product(product_id: int) -> Product | None:
+        if product_id in product_cache:
+            return product_cache[product_id]
+        product_cache[product_id] = (
+            Product.query.options(joinedload(Product.product_extras), joinedload(Product.category))
+            .filter_by(id=product_id, is_active=True)
+            .first()
+        )
+        return product_cache[product_id]
+
+    def create_item(product: Product, quantity: int, extra_counts: dict[int, int] | None = None) -> None:
+        nonlocal added_items
+        order_item = OrderItem(
+            order_id=order.id,
+            product_id=product.id,
+            quantity=quantity,
+            unit_price=product.price,
+            status=product.initial_item_status(),
+        )
+        db.session.add(order_item)
+        db.session.flush()
+        apply_extras_to_item(order_item, extra_counts or {}, product)
+        added_items += quantity
+
+    payload_ids: set[int] = set()
+    food_payload_raw = request.form.get("food_payload")
+    if food_payload_raw:
+        try:
+            payload_entries = json.loads(food_payload_raw)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            payload_entries = []
+        for entry in payload_entries:
+            if not isinstance(entry, dict):
+                continue
+            product_id = entry.get("product_id")
+            if not isinstance(product_id, int):
+                continue
+            product = load_product(product_id)
+            if not product:
+                continue
+            payload_ids.add(product.id)
+            extras_list = entry.get("extras") or []
+            extra_counts: dict[int, int] = {}
+            for extra_id in extras_list:
+                try:
+                    extra_key = int(extra_id)
+                except (TypeError, ValueError):
+                    continue
+                extra_counts[extra_key] = extra_counts.get(extra_key, 0) + 1
+            create_item(product, 1, extra_counts)
+
     for key, value in request.form.items():
         if not key.startswith("quantity_"):
             continue
@@ -185,26 +239,15 @@ def add_items(order_id: int):
         if quantity <= 0:
             continue
 
-        product = (
-            Product.query.options(joinedload(Product.product_extras), joinedload(Product.category))
-            .filter_by(id=product_id, is_active=True)
-            .first()
-        )
+        if product_id in payload_ids:
+            continue
+
+        product = load_product(product_id)
         if not product or not product.is_active:
             continue
 
-        order_item = OrderItem(
-            order_id=order.id,
-            product_id=product.id,
-            quantity=quantity,
-            unit_price=product.price,
-            status=product.initial_item_status(),
-        )
-        db.session.add(order_item)
-        db.session.flush()
         extra_counts = collect_extra_counts(request.form, product)
-        apply_extras_to_item(order_item, extra_counts, product)
-        added_items += quantity
+        create_item(product, quantity, extra_counts)
 
     if added_items:
         order.recalc_status()

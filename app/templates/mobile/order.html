@@ -110,14 +110,31 @@
                             <div class="mb-3">
                                 <h5>{{ category.name }}</h5>
                                 {% for product in products %}
-                                <div class="d-flex align-items-center mb-2 gap-2">
+                                {% set is_food = product.category and (product.category.name|lower == 'menjar') %}
+                                {% set extras_ns = namespace(items=[]) %}
+                                {% for link in product.product_extras if link.extra and link.extra.is_active %}
+                                    {% set extras_ns.items = extras_ns.items + [{
+                                        'id': link.extra.id,
+                                        'name': link.extra.name,
+                                        'price_delta': link.extra.price_delta,
+                                        'max_quantity': link.max_quantity
+                                    }] %}
+                                {% endfor %}
+                                <div
+                                    class="d-flex align-items-center mb-2 gap-2 js-product-row"
+                                    data-product-id="{{ product.id }}"
+                                    data-product-name="{{ product.name }}"
+                                    data-category-kind="{{ 'food' if is_food else 'standard' }}"
+                                    data-product-price="{{ '%.2f'|format(product.price) }}"
+                                    data-product-extras='{{ extras_ns.items|tojson }}'
+                                >
                                     <div class="flex-grow-1">
                                         <div>{{ product.name }}</div>
                                         <small class="text-white-50">€ {{ '%.2f'|format(product.price) }}</small>
-                                        {% if product.product_extras %}
+                                        {% if product.product_extras and not is_food %}
                                         <div class="mt-2 ps-2 border-start border-light">
                                             <div class="small text-white-50 mb-1">Extres</div>
-                                            {% for link in product.product_extras if link.extra.is_active %}
+                                            {% for link in product.product_extras if link.extra and link.extra.is_active %}
                                                 {% set field_id = 'extra' ~ product.id ~ '_' ~ link.extra.id %}
                                                 <input
                                                     type="hidden"
@@ -144,18 +161,48 @@
                                                 </div>
                                             {% endfor %}
                                         </div>
+                                        {% elif is_food %}
+                                        <div class="js-food-selection-wrapper d-none mt-2" data-product-id="{{ product.id }}">
+                                            <div class="small text-white-50 mb-1">Selecció actual</div>
+                                            <ul class="list-unstyled mb-0 mobile-food-selection-list js-food-selection-list" data-product-id="{{ product.id }}"></ul>
+                                        </div>
                                         {% endif %}
                                     </div>
                                     <div class="btn-group" role="group" aria-label="Controls {{ product.id }}">
-                                        <button class="btn btn-soft-danger btn-sm js-minus" type="button" data-target="qty{{ product.id }}">-</button>
-                                        <input class="form-control form-control-sm text-center js-qty" name="quantity_{{ product.id }}" id="qty{{ product.id }}" type="number" min="0" value="0" data-price="{{ product.price }}" data-product-id="{{ product.id }}" style="width:70px;">
-                                        <button class="btn btn-soft-success btn-sm js-plus" type="button" data-target="qty{{ product.id }}">+</button>
+                                        <button
+                                            class="btn btn-soft-danger btn-sm js-minus"
+                                            type="button"
+                                            data-target="qty{{ product.id }}"
+                                            data-product-id="{{ product.id }}"
+                                            data-control-mode="{{ 'food' if is_food else 'standard' }}"
+                                        >-</button>
+                                        <input
+                                            class="form-control form-control-sm text-center js-qty"
+                                            name="quantity_{{ product.id }}"
+                                            id="qty{{ product.id }}"
+                                            type="number"
+                                            min="0"
+                                            value="0"
+                                            data-price="{{ product.price }}"
+                                            data-product-id="{{ product.id }}"
+                                            data-control-mode="{{ 'food' if is_food else 'standard' }}"
+                                            {% if is_food %}readonly{% endif %}
+                                            style="width:70px;"
+                                        >
+                                        <button
+                                            class="btn btn-soft-success btn-sm js-plus"
+                                            type="button"
+                                            data-target="qty{{ product.id }}"
+                                            data-product-id="{{ product.id }}"
+                                            data-control-mode="{{ 'food' if is_food else 'standard' }}"
+                                        >+</button>
                                     </div>
                                 </div>
                                 {% endfor %}
                             </div>
                             {% endfor %}
                             <p class="mt-3">Subtotal seleccionat: <strong id="selectionTotal">€ 0.00</strong></p>
+                            <input type="hidden" name="food_payload" id="foodPayloadField" value="">
                             <button class="btn btn-success w-100" type="submit">Afegir a la comanda</button>
                         </form>
                     </div>
@@ -172,6 +219,27 @@
     </div>
 </div>
 {% endblock %}
+<div class="modal fade" id="foodExtrasModal" tabindex="-1" aria-labelledby="foodExtrasModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border border-light-subtle">
+            <div class="modal-header border-0">
+                <div>
+                    <h5 class="modal-title" id="foodExtrasModalLabel">Personalitzar producte</h5>
+                    <p class="mb-0 small text-white-50 js-food-modal-description"></p>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Tancar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="js-food-extra-options d-flex flex-wrap gap-2"></div>
+                <p class="small text-white-50 mt-3 js-food-extra-empty d-none">Aquest producte no té extres disponibles. Pots desar-lo directament.</p>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cancel·lar</button>
+                <button type="button" class="btn btn-success js-food-modal-confirm">Sense extres</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% block scripts %}
 {% if selected_order %}
 <script>
@@ -179,6 +247,82 @@ const qtyInputs = document.querySelectorAll('.js-qty');
 const extraInputs = document.querySelectorAll('#quickAdd .js-extra');
 const extraControls = document.querySelectorAll('#quickAdd .js-extra-counter');
 const totalOutput = document.getElementById('selectionTotal');
+const productRows = document.querySelectorAll('.js-product-row');
+const productMeta = new Map();
+const foodSelections = new Map();
+const foodPayloadField = document.getElementById('foodPayloadField');
+const quickAddForm = document.getElementById('quickAdd');
+const foodSelectionWrappers = document.querySelectorAll('.js-food-selection-wrapper');
+const foodModalEl = document.getElementById('foodExtrasModal');
+const foodModal = foodModalEl && window.bootstrap ? new window.bootstrap.Modal(foodModalEl) : null;
+const foodModalTitle = document.getElementById('foodExtrasModalLabel');
+const foodModalDescription = foodModalEl ? foodModalEl.querySelector('.js-food-modal-description') : null;
+const foodModalOptions = foodModalEl ? foodModalEl.querySelector('.js-food-extra-options') : null;
+const foodModalEmptyHint = foodModalEl ? foodModalEl.querySelector('.js-food-extra-empty') : null;
+const foodModalConfirm = foodModalEl ? foodModalEl.querySelector('.js-food-modal-confirm') : null;
+let activeFoodProductId = null;
+let activeFoodExtras = new Set();
+function safeParseJson(raw, fallback) {
+    if (!raw) {
+        return fallback;
+    }
+    try {
+        return JSON.parse(raw);
+    } catch (err) {
+        return fallback;
+    }
+}
+(function registerProducts() {
+    productRows.forEach((row) => {
+        const productId = row.dataset.productId;
+        if (!productId) {
+            return;
+        }
+        const extras = safeParseJson(row.dataset.productExtras, []);
+        extras.forEach((extra) => {
+            extra.price_delta = Number(extra.price_delta || 0);
+        });
+        const extrasMap = new Map(extras.map((extra) => [String(extra.id), extra]));
+        const meta = {
+            name: row.dataset.productName || '',
+            price: parseFloat(row.dataset.productPrice || '0') || 0,
+            category: row.dataset.categoryKind || 'standard',
+            extras,
+            extrasMap,
+        };
+        productMeta.set(productId, meta);
+        if (meta.category === 'food') {
+            foodSelections.set(productId, []);
+            syncFoodMinusState(productId);
+        }
+    });
+})();
+if (foodSelectionWrappers.length) {
+    foodSelectionWrappers.forEach((wrapper) => {
+        wrapper.addEventListener('click', (event) => {
+            const removeBtn = event.target.closest('.js-remove-selection');
+            if (!removeBtn) {
+                return;
+            }
+            event.preventDefault();
+            removeFoodSelection(wrapper.dataset.productId, removeBtn.dataset.selectionId);
+        });
+    });
+}
+if (quickAddForm) {
+    quickAddForm.addEventListener('submit', () => updateFoodPayloadField());
+}
+if (foodModalConfirm) {
+    foodModalConfirm.addEventListener('click', persistFoodSelection);
+}
+if (foodModalEl) {
+    foodModalEl.addEventListener('hidden.bs.modal', () => {
+        activeFoodProductId = null;
+        activeFoodExtras = new Set();
+        syncFoodModalBadges();
+        updateFoodModalConfirmLabel();
+    });
+}
 function updateTotal() {
     let total = 0;
     qtyInputs.forEach((input) => {
@@ -193,7 +337,29 @@ function updateTotal() {
             total += count * parseFloat(input.dataset.extraPrice || '0');
         }
     });
+    total += calculateFoodExtrasTotal();
     totalOutput.textContent = `€ ${total.toFixed(2)}`;
+}
+function calculateFoodExtrasTotal() {
+    let extraTotal = 0;
+    foodSelections.forEach((selections, productId) => {
+        if (!selections || !selections.length) {
+            return;
+        }
+        const meta = productMeta.get(productId);
+        if (!meta) {
+            return;
+        }
+        selections.forEach((selection) => {
+            selection.extras.forEach((extraId) => {
+                const extra = meta.extrasMap.get(String(extraId));
+                if (extra) {
+                    extraTotal += Number(extra.price_delta || 0);
+                }
+            });
+        });
+    });
+    return extraTotal;
 }
 function getMaxExtraCount(control) {
     const qtyTarget = control.dataset.qtyTarget;
@@ -276,10 +442,18 @@ function handleQtyChange(input) {
     updateTotal();
 }
 document.querySelectorAll('.js-plus').forEach((btn) => {
-    btn.addEventListener('click', () => adjustValue(btn.dataset.target, 1));
+    if (btn.dataset.controlMode === 'food') {
+        btn.addEventListener('click', () => openFoodModal(btn.dataset.productId));
+    } else {
+        btn.addEventListener('click', () => adjustValue(btn.dataset.target, 1));
+    }
 });
 document.querySelectorAll('.js-minus').forEach((btn) => {
-    btn.addEventListener('click', () => adjustValue(btn.dataset.target, -1));
+    if (btn.dataset.controlMode === 'food') {
+        btn.addEventListener('click', () => removeLastSelection(btn.dataset.productId));
+    } else {
+        btn.addEventListener('click', () => adjustValue(btn.dataset.target, -1));
+    }
 });
 qtyInputs.forEach((input) => input.addEventListener('input', () => handleQtyChange(input)));
 extraControls.forEach((control) => {
@@ -290,7 +464,212 @@ extraControls.forEach((control) => {
     clampExtraControl(control);
 });
 extraInputs.forEach((input) => input.addEventListener('input', updateTotal));
+updateFoodPayloadField();
 updateTotal();
+function openFoodModal(productId) {
+    if (!productId || !foodModal) {
+        return;
+    }
+    const meta = productMeta.get(productId);
+    if (!meta) {
+        return;
+    }
+    activeFoodProductId = productId;
+    activeFoodExtras = new Set();
+    if (foodModalTitle) {
+        foodModalTitle.textContent = `Extres per ${meta.name}`;
+    }
+    if (foodModalDescription) {
+        foodModalDescription.textContent = meta.extras && meta.extras.length
+            ? 'Afegeix o treu extres tocant els badges'
+            : 'Aquest producte no té extres. Desa per afegir-lo sense extres.';
+    }
+    renderFoodModalOptions(meta);
+    updateFoodModalConfirmLabel();
+    foodModal.show();
+}
+function renderFoodModalOptions(meta) {
+    if (!foodModalOptions || !foodModalEmptyHint) {
+        return;
+    }
+    foodModalOptions.innerHTML = '';
+    if (!meta.extras || !meta.extras.length) {
+        foodModalEmptyHint.classList.remove('d-none');
+        return;
+    }
+    foodModalEmptyHint.classList.add('d-none');
+    meta.extras.forEach((extra) => {
+        const badge = document.createElement('button');
+        badge.type = 'button';
+        badge.className = 'mobile-food-extra-badge btn btn-outline-light btn-sm';
+        badge.dataset.extraId = String(extra.id);
+        const label = document.createElement('span');
+        label.className = 'fw-semibold';
+        label.textContent = extra.name;
+        const price = document.createElement('small');
+        price.className = 'ms-1 text-white-50';
+        price.textContent = `+€ ${Number(extra.price_delta || 0).toFixed(2)}`;
+        badge.append(label, price);
+        badge.addEventListener('click', () => toggleFoodExtra(String(extra.id)));
+        foodModalOptions.appendChild(badge);
+    });
+    syncFoodModalBadges();
+}
+function toggleFoodExtra(extraId) {
+    if (!extraId) {
+        return;
+    }
+    if (activeFoodExtras.has(extraId)) {
+        activeFoodExtras.delete(extraId);
+    } else {
+        activeFoodExtras.add(extraId);
+    }
+    updateFoodModalConfirmLabel();
+    syncFoodModalBadges();
+}
+function syncFoodModalBadges() {
+    if (!foodModalOptions) {
+        return;
+    }
+    foodModalOptions.querySelectorAll('[data-extra-id]').forEach((badge) => {
+        badge.classList.toggle('active', activeFoodExtras.has(badge.dataset.extraId));
+    });
+}
+function updateFoodModalConfirmLabel() {
+    if (!foodModalConfirm) {
+        return;
+    }
+    foodModalConfirm.textContent = activeFoodExtras.size ? 'Desar' : 'Sense extres';
+}
+function persistFoodSelection() {
+    if (!activeFoodProductId) {
+        return;
+    }
+    addFoodSelection(activeFoodProductId, Array.from(activeFoodExtras));
+    if (foodModal) {
+        foodModal.hide();
+    }
+}
+function addFoodSelection(productId, extras) {
+    const key = String(productId);
+    const bucket = foodSelections.get(key) || [];
+    bucket.push({
+        id: `${key}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        extras: Array.isArray(extras) ? extras.map((extraId) => String(extraId)) : [],
+    });
+    foodSelections.set(key, bucket);
+    updateFoodQtyInput(key);
+    renderFoodSelectionList(key);
+    updateFoodPayloadField();
+}
+function removeFoodSelection(productId, selectionId) {
+    const key = String(productId);
+    const bucket = foodSelections.get(key);
+    if (!bucket || !selectionId) {
+        return;
+    }
+    const filtered = bucket.filter((entry) => entry.id !== selectionId);
+    foodSelections.set(key, filtered);
+    updateFoodQtyInput(key);
+    renderFoodSelectionList(key);
+    updateFoodPayloadField();
+}
+function removeLastSelection(productId) {
+    const key = String(productId);
+    const bucket = foodSelections.get(key);
+    if (!bucket || !bucket.length) {
+        return;
+    }
+    bucket.pop();
+    foodSelections.set(key, bucket);
+    updateFoodQtyInput(key);
+    renderFoodSelectionList(key);
+    updateFoodPayloadField();
+}
+function updateFoodQtyInput(productId) {
+    const input = document.getElementById(`qty${productId}`);
+    if (!input) {
+        return;
+    }
+    const bucket = foodSelections.get(String(productId)) || [];
+    input.value = bucket.length;
+    handleQtyChange(input);
+    syncFoodMinusState(productId);
+}
+function syncFoodMinusState(productId) {
+    const minus = document.querySelector(`.js-minus[data-product-id="${productId}"]`);
+    if (!minus) {
+        return;
+    }
+    const bucket = foodSelections.get(String(productId)) || [];
+    minus.disabled = bucket.length === 0;
+}
+function renderFoodSelectionList(productId) {
+    const wrapper = document.querySelector(`.js-food-selection-wrapper[data-product-id="${productId}"]`);
+    if (!wrapper) {
+        return;
+    }
+    const listEl = wrapper.querySelector('.js-food-selection-list');
+    if (!listEl) {
+        return;
+    }
+    const bucket = foodSelections.get(String(productId)) || [];
+    listEl.innerHTML = '';
+    if (!bucket.length) {
+        wrapper.classList.add('d-none');
+        return;
+    }
+    const meta = productMeta.get(String(productId));
+    bucket.forEach((entry) => {
+        const li = document.createElement('li');
+        li.className = 'mobile-food-selection-entry d-flex justify-content-between align-items-center gap-2';
+        li.dataset.selectionId = entry.id;
+        const details = document.createElement('div');
+        details.className = 'mobile-food-selection-details';
+        if (!entry.extras.length) {
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-dark-subtle text-dark fw-semibold';
+            badge.textContent = 'Sense extres';
+            details.appendChild(badge);
+        } else {
+            entry.extras.forEach((extraId) => {
+                const extra = meta ? meta.extrasMap.get(String(extraId)) : null;
+                if (!extra) {
+                    return;
+                }
+                const badge = document.createElement('span');
+                badge.className = 'badge bg-warning text-dark fw-semibold me-1 mobile-food-selection-badge';
+                badge.textContent = extra.name;
+                details.appendChild(badge);
+            });
+        }
+        li.appendChild(details);
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className = 'btn btn-outline-danger btn-sm js-remove-selection';
+        removeButton.dataset.selectionId = entry.id;
+        removeButton.setAttribute('aria-label', 'Esborrar selecció');
+        removeButton.textContent = '×';
+        li.appendChild(removeButton);
+        listEl.appendChild(li);
+    });
+    wrapper.classList.remove('d-none');
+}
+function updateFoodPayloadField() {
+    if (!foodPayloadField) {
+        return;
+    }
+    const serialized = [];
+    foodSelections.forEach((entries, productId) => {
+        entries.forEach((entry) => {
+            serialized.push({
+                product_id: Number(productId),
+                extras: entry.extras.map((extraId) => Number(extraId)),
+            });
+        });
+    });
+    foodPayloadField.value = serialized.length ? JSON.stringify(serialized) : '';
+}
 
 const deliveryRows = document.querySelectorAll('.js-mobile-item');
 function isInteractiveElement(target) {

@@ -4,6 +4,7 @@ import warnings
 
 import pytest
 from sqlalchemy.exc import LegacyAPIWarning
+import json
 
 warnings.filterwarnings("ignore", category=LegacyAPIWarning)
 warnings.filterwarnings("ignore", message=".*LegacyAPIWarning.*")
@@ -187,3 +188,95 @@ def test_product_initial_status_respects_category_flag(client):
 
         assert auto_product.initial_item_status() == OrderItemStatus.PREPARED
         assert manual_product.initial_item_status() == OrderItemStatus.PENDING
+
+def test_mobile_add_items_with_food_payload(client):
+    with client.application.app_context():
+        staff = StaffUser(name="Payload User", is_active=True)
+        table = Table(name="Taula Payload", seats=4)
+        category = _get_category("Menjar", sort_order=10)
+        product = Product(name="Entrepà Payload", price=7.0, category=category)
+        extra_one = Extra(name="Formatge", price_delta=0.5)
+        extra_two = Extra(name="Tomata", price_delta=0.3)
+        db.session.add_all([staff, table, product, extra_one, extra_two])
+        db.session.flush()
+        db.session.add_all([
+            ProductExtra(product_id=product.id, extra_id=extra_one.id),
+            ProductExtra(product_id=product.id, extra_id=extra_two.id),
+        ])
+        order = Order(table_id=table.id, created_by=staff)
+        order.sync_legacy_status()
+        db.session.add(order)
+        db.session.commit()
+        order_id = order.id
+        staff_id = staff.id
+        product_id = product.id
+        extra_one_id = extra_one.id
+        extra_two_id = extra_two.id
+        extra_one_name = extra_one.name
+        extra_two_name = extra_two.name
+
+    with client.session_transaction() as session_state:
+        session_state["mobile_user_id"] = staff_id
+        session_state["mobile_user_name"] = "Payload User"
+
+    payload = [
+        {"product_id": product_id, "extras": []},
+        {"product_id": product_id, "extras": [extra_one_id, extra_two_id]},
+    ]
+
+    response = client.post(
+        f"/mobile/orders/{order_id}/add-items",
+        data={"food_payload": json.dumps(payload)},
+    )
+    assert response.status_code == 302
+
+    with client.application.app_context():
+        refreshed = db.session.get(Order, order_id)
+        assert refreshed is not None
+        assert len(refreshed.items) == 2
+        for item in refreshed.items:
+            assert item.quantity == 1
+        extra_sets = [sorted(extra.label for extra in item.extras) for item in refreshed.items]
+        assert [] in extra_sets
+        assert sorted([extra_one_name, extra_two_name]) in extra_sets
+
+
+def test_mobile_add_items_mixed_payload_and_quantities(client):
+    with client.application.app_context():
+        staff = StaffUser(name="Mixt", is_active=True)
+        table = Table(name="Taula Mixta", seats=4)
+        food_category = _get_category("Menjar", sort_order=10)
+        drink_category = _get_category("Begudes", sort_order=5)
+        food_product = Product(name="Entrepà Mixt", price=6.0, category=food_category)
+        drink_product = Product(name="Begueta", price=2.5, category=drink_category)
+        db.session.add_all([staff, table, food_product, drink_product])
+        db.session.flush()
+        order = Order(table_id=table.id, created_by=staff)
+        order.sync_legacy_status()
+        db.session.add(order)
+        db.session.commit()
+        order_id = order.id
+        staff_id = staff.id
+        food_product_id = food_product.id
+        drink_product_id = drink_product.id
+
+    with client.session_transaction() as session_state:
+        session_state["mobile_user_id"] = staff_id
+        session_state["mobile_user_name"] = "Mixt"
+
+    payload = [{"product_id": food_product_id, "extras": []}]
+    form_data = {
+        "food_payload": json.dumps(payload),
+        f"quantity_{drink_product_id}": "2",
+    }
+
+    response = client.post(f"/mobile/orders/{order_id}/add-items", data=form_data)
+    assert response.status_code == 302
+
+    with client.application.app_context():
+        refreshed = db.session.get(Order, order_id)
+        assert refreshed is not None
+        assert len(refreshed.items) == 2
+        quantities = {item.product_id: item.quantity for item in refreshed.items}
+        assert quantities.get(food_product_id) == 1
+        assert quantities.get(drink_product_id) == 2

@@ -158,6 +158,42 @@ body {
     }
 }
 
+.mobile-food-selection-wrapper {
+    border-left: 2px solid rgba(255, 255, 255, 0.15);
+    padding-left: 0.75rem;
+}
+.mobile-food-selection-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+.mobile-food-selection-entry {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 0.5rem;
+    padding: 0.35rem 0.5rem;
+}
+.mobile-food-selection-entry .btn {
+    line-height: 1;
+    padding: 0.2rem 0.45rem;
+}
+.mobile-food-selection-badge {
+    margin-bottom: 0.15rem;
+}
+.mobile-food-extra-badge {
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.mobile-food-extra-badge.active {
+    background-color: #f0b429;
+    border-color: #f0b429;
+    color: #1a1b1f;
+}
+.mobile-food-extra-badge.active small {
+    color: #1a1b1f;
+}
+
 .kitchen-ticket {
     border: 1px solid #e3e5ec;
     box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
