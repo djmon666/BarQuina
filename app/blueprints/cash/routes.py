@@ -48,6 +48,17 @@ def close_session(session_id: int):
     return redirect(url_for("cash.sessions"))
 
 
+@bp.route("/sessions/<int:session_id>/reopen", methods=["POST"])
+def reopen_session(session_id: int):
+    session = CashSession.query.get_or_404(session_id)
+    session.is_open = True
+    session.closing_amount = None
+    session.closed_at = None
+    db.session.commit()
+    flash("Sessió reoberta", "success")
+    return redirect(url_for("cash.sessions"))
+
+
 @bp.route("/sessions/<int:session_id>/movements", methods=["POST"])
 def add_movement(session_id: int):
     session = CashSession.query.get_or_404(session_id)

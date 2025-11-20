@@ -71,6 +71,10 @@
                     <input class="form-control form-control-sm" type="number" name="closing_amount" step="0.01" placeholder="Total">
                     <button class="btn btn-sm btn-outline-danger">Tanca</button>
                 </form>
+                {% else %}
+                <form method="post" action="{{ url_for('cash.reopen_session', session_id=session.id) }}">
+                    <button class="btn btn-sm btn-outline-secondary">Reobre</button>
+                </form>
                 {% endif %}
             </td>
         </tr>

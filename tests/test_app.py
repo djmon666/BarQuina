@@ -19,6 +19,8 @@ from typing import Any
 
 from app.models import (
     Category,
+    CashMovement,
+    CashMovementType,
     CashSession,
     Extra,
     FulfillmentStatus,
@@ -479,3 +481,80 @@ def test_cash_close_rejects_invalid_amount(client):
         assert refreshed is not None
         assert refreshed.closing_amount is None
         assert refreshed.is_open is True
+
+
+def test_cash_session_can_be_reopened(client):
+    with client.application.app_context():
+        session = CashSession(opening_float=80.0)
+        db.session.add(session)
+        db.session.commit()
+        session_id = session.id
+
+    close_resp = client.post(
+        f"/cash/sessions/{session_id}/close",
+        data={"closing_amount": "100.5"},
+        follow_redirects=True,
+    )
+    assert close_resp.status_code == 200
+
+    reopen_resp = client.post(f"/cash/sessions/{session_id}/reopen", follow_redirects=True)
+    assert reopen_resp.status_code == 200
+
+    with client.application.app_context():
+        refreshed = db.session.get(CashSession, session_id)
+        assert refreshed is not None
+        assert refreshed.is_open is True
+        assert refreshed.closing_amount is None
+
+
+def test_cash_session_totals_and_expected_amount(client):
+    with client.application.app_context():
+        session = CashSession(opening_float=100.0)
+        db.session.add(session)
+        db.session.flush()
+        movements = [
+            CashMovement(session_id=session.id, movement_type=CashMovementType.SALE, amount=50.0),
+            CashMovement(session_id=session.id, movement_type=CashMovementType.DEPOSIT, amount=20.0),
+            CashMovement(session_id=session.id, movement_type=CashMovementType.WITHDRAWAL, amount=10.0),
+            CashMovement(session_id=session.id, movement_type=CashMovementType.ADJUSTMENT, amount=3.0),
+        ]
+        db.session.add_all(movements)
+        session.closing_amount = 160.0
+        db.session.commit()
+        session_id = session.id
+
+    with client.application.app_context():
+        refreshed = db.session.get(CashSession, session_id)
+        assert refreshed is not None
+        assert refreshed.total_sales == pytest.approx(50.0)
+        assert refreshed.total_deposits == pytest.approx(20.0)
+        assert refreshed.total_withdrawals == pytest.approx(10.0)
+        assert refreshed.total_adjustments == pytest.approx(3.0)
+        assert refreshed.movement_net_total == pytest.approx(63.0)
+        assert refreshed.expected_closing_amount == pytest.approx(163.0)
+        assert refreshed.closing_difference == pytest.approx(-3.0)
+
+
+def test_cash_sessions_page_displays_movement_net_and_difference(client):
+    with client.application.app_context():
+        session = CashSession(opening_float=41.23)
+        db.session.add(session)
+        db.session.flush()
+        db.session.add_all(
+            [
+                CashMovement(session_id=session.id, movement_type=CashMovementType.SALE, amount=10.10),
+                CashMovement(session_id=session.id, movement_type=CashMovementType.DEPOSIT, amount=5.50),
+                CashMovement(session_id=session.id, movement_type=CashMovementType.WITHDRAWAL, amount=3.60),
+                CashMovement(session_id=session.id, movement_type=CashMovementType.ADJUSTMENT, amount=0.75),
+            ]
+        )
+        session.closing_amount = 52.50
+        db.session.commit()
+
+    response = client.get("/cash/sessions")
+    assert response.status_code == 200
+    html = response.data.decode("utf-8")
+    assert "Mov. net" in html
+    assert "€ 12.75" in html
+    assert "€ 53.98" in html
+    assert "€ -1.48" in html
