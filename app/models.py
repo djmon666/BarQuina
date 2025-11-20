@@ -274,6 +274,50 @@ class CashSession(db.Model):
 
     movements = db.relationship("CashMovement", back_populates="session", cascade="all, delete-orphan")
 
+    def _movement_total(self, movement_type: CashMovementType) -> float:
+        return round(
+            sum(movement.amount for movement in self.movements if movement.movement_type == movement_type),
+            2,
+        )
+
+    @property
+    def total_sales(self) -> float:
+        return self._movement_total(CashMovementType.SALE)
+
+    @property
+    def total_deposits(self) -> float:
+        return self._movement_total(CashMovementType.DEPOSIT)
+
+    @property
+    def total_withdrawals(self) -> float:
+        return self._movement_total(CashMovementType.WITHDRAWAL)
+
+    @property
+    def total_adjustments(self) -> float:
+        return self._movement_total(CashMovementType.ADJUSTMENT)
+
+    @property
+    def expected_closing_amount(self) -> float:
+        return round(
+            (self.opening_float or 0)
+            + self.total_sales
+            + self.total_deposits
+            - self.total_withdrawals
+            + self.total_adjustments,
+            2,
+        )
+
+    @property
+    def closing_difference(self) -> float | None:
+        if self.closing_amount is None:
+            return None
+        return round(self.closing_amount - self.expected_closing_amount, 2)
+
+    @property
+    def movement_net_total(self) -> float:
+        total = self.total_sales + self.total_deposits - self.total_withdrawals + self.total_adjustments
+        return round(total, 2)
+
 
 class CashMovement(db.Model):
     __tablename__ = "cash_movements"

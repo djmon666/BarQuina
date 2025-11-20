@@ -8,10 +8,22 @@ from ...models import CashMovement, CashMovementType, CashSession
 bp = Blueprint("cash", __name__)
 
 
+def _parse_amount(raw_value: str | None, default: float = 0.0) -> float:
+    normalized = (raw_value or "").strip()
+    if not normalized:
+        return default
+    normalized = normalized.replace(",", ".")
+    return float(normalized)
+
+
 @bp.route("/sessions", methods=["GET", "POST"])
 def sessions():
     if request.method == "POST":
-        opening_float = float(request.form.get("opening_float", 0))
+        try:
+            opening_float = _parse_amount(request.form.get("opening_float"), default=0.0)
+        except ValueError:
+            flash("Introdueix un import vàlid per obrir caixa", "danger")
+            return redirect(url_for("cash.sessions"))
         db.session.add(CashSession(opening_float=opening_float))
         db.session.commit()
         flash("Sessió de caixa oberta", "success")
@@ -24,7 +36,11 @@ def sessions():
 @bp.route("/sessions/<int:session_id>/close", methods=["POST"])
 def close_session(session_id: int):
     session = CashSession.query.get_or_404(session_id)
-    closing_amount = float(request.form.get("closing_amount", 0))
+    try:
+        closing_amount = _parse_amount(request.form.get("closing_amount"), default=0.0)
+    except ValueError:
+        flash("Introdueix un import final vàlid", "danger")
+        return redirect(url_for("cash.sessions"))
     session.closing_amount = closing_amount
     session.is_open = False
     db.session.commit()
@@ -36,7 +52,11 @@ def close_session(session_id: int):
 def add_movement(session_id: int):
     session = CashSession.query.get_or_404(session_id)
     movement_type = CashMovementType(request.form.get("movement_type", CashMovementType.SALE.value))
-    amount = float(request.form.get("amount", 0))
+    try:
+        amount = _parse_amount(request.form.get("amount"), default=0.0)
+    except ValueError:
+        flash("Introdueix un import de moviment vàlid", "danger")
+        return redirect(url_for("cash.sessions"))
     note = request.form.get("note", "")
 
     if amount <= 0:

@@ -19,6 +19,7 @@ from typing import Any
 
 from app.models import (
     Category,
+    CashSession,
     Extra,
     FulfillmentStatus,
     Order,
@@ -440,3 +441,41 @@ def test_order_audit_logs_creation_and_status_change(client):
         latest = logs[-1]
         assert latest.action == "order_status_updated"
         assert "fulfillment" in latest.details
+
+
+def test_cash_close_accepts_blank_amount(client):
+    with client.application.app_context():
+        session = CashSession(opening_float=50.0)
+        db.session.add(session)
+        db.session.commit()
+        session_id = session.id
+
+    response = client.post(f"/cash/sessions/{session_id}/close", data={"closing_amount": ""})
+    assert response.status_code == 302
+
+    with client.application.app_context():
+        refreshed = db.session.get(CashSession, session_id)
+        assert refreshed is not None
+        assert refreshed.closing_amount == 0
+        assert refreshed.is_open is False
+
+
+def test_cash_close_rejects_invalid_amount(client):
+    with client.application.app_context():
+        session = CashSession(opening_float=25.0)
+        db.session.add(session)
+        db.session.commit()
+        session_id = session.id
+
+    response = client.post(
+        f"/cash/sessions/{session_id}/close",
+        data={"closing_amount": "abc"},
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+
+    with client.application.app_context():
+        refreshed = db.session.get(CashSession, session_id)
+        assert refreshed is not None
+        assert refreshed.closing_amount is None
+        assert refreshed.is_open is True
