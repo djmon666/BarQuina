@@ -206,6 +206,27 @@
                 </form>
             </div>
         </div>
+            {% if order_audit_logs %}
+            <div class="card mt-3">
+                <div class="card-header">Històric de canvis</div>
+                <ul class="list-group list-group-flush">
+                    {% for log in order_audit_logs %}
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between">
+                            <span class="fw-semibold text-capitalize">{{ log.action.replace('_', ' ') }}</span>
+                            <small class="text-muted">{{ log.created_at.strftime('%d/%m %H:%M:%S') }}</small>
+                        </div>
+                        {% if log.actor_name %}
+                        <small class="text-muted">Per {{ log.actor_name }}</small>
+                        {% endif %}
+                        {% if log.details %}
+                        <pre class="small text-muted mb-0">{{ log.details|tojson(indent=2) }}</pre>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
     </div>
 </div>
 {% else %}

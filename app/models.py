@@ -330,3 +330,23 @@ class OrderItemExtra(db.Model):
 
     def total(self) -> float:
         return round(self.price_delta * self.quantity, 2)
+
+
+class OrderAuditLog(db.Model):
+    __tablename__ = "order_audit_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey("orders.id"), nullable=False)
+    table_id = db.Column(db.Integer, db.ForeignKey("tables.id"), nullable=False)
+    staff_user_id = db.Column(db.Integer, db.ForeignKey("staff_users.id"))
+    actor_name = db.Column(db.String(120))
+    action = db.Column(db.String(64), nullable=False)
+    details = db.Column(db.JSON, default=dict)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    order = db.relationship("Order", backref="audit_logs")
+    table = db.relationship("Table")
+    staff_user = db.relationship("StaffUser")
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"OrderAuditLog(order={self.order_id}, action={self.action})"

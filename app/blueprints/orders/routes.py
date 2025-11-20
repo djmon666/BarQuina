@@ -18,9 +18,11 @@ from ...models import (
     PaymentStatus,
     Product,
     Table,
+    OrderAuditLog,
 )
 from ...realtime import emit_order_update
 from ...extras_utils import apply_extras_to_item, collect_extra_counts
+from ...audit_utils import log_order_event, log_order_status_change
 
 bp = Blueprint("orders", __name__, url_prefix="")
 
@@ -137,6 +139,14 @@ def table_detail(table_id: int):
                 global_next_order = global_open_orders[idx + 1]
             break
     product_groups = _grouped_products()
+    audit_logs: list[OrderAuditLog] = []
+    if order:
+        audit_logs = (
+            OrderAuditLog.query.filter_by(order_id=order.id)
+            .order_by(OrderAuditLog.created_at.desc())
+            .limit(20)
+            .all()
+        )
     return render_template(
         "orders/table_detail.html",
         table=table,
@@ -153,6 +163,7 @@ def table_detail(table_id: int):
         global_prev_order=global_prev_order,
         global_next_order=global_next_order,
         global_position=global_position,
+        order_audit_logs=audit_logs,
     )
 
 
@@ -162,6 +173,13 @@ def create_order(table_id: int):
     order = Order(table_id=table.id)
     order.sync_legacy_status()
     db.session.add(order)
+    db.session.flush()
+    log_order_event(
+        order,
+        "order_created",
+        actor_name="dashboard",
+        details={"source": "dashboard", "table": table.name},
+    )
     db.session.commit()
     emit_order_update(order)
     flash("Comanda creada", "success")
@@ -171,6 +189,8 @@ def create_order(table_id: int):
 @bp.route("/orders/<int:order_id>/items", methods=["POST"])
 def add_item(order_id: int):
     order = Order.query.get_or_404(order_id)
+    prev_fulfillment = order.fulfillment_status
+    prev_payment = order.payment_status
     product_id = request.form.get("product_id", type=int)
     quantity = max(int(request.form.get("quantity", 1)), 1)
     notes = request.form.get("notes", "")
@@ -195,6 +215,17 @@ def add_item(order_id: int):
     order.fulfillment_status = FulfillmentStatus.PENDING_DELIVERY
     order.payment_status = PaymentStatus.PENDING_PAYMENT
     order.sync_legacy_status()
+    log_order_status_change(
+        order,
+        prev_fulfillment,
+        prev_payment,
+        actor_name="dashboard",
+        details={
+            "source": "dashboard/add_item",
+            "product_id": product.id,
+            "quantity": quantity,
+        },
+    )
     db.session.commit()
     emit_order_update(order)
     flash("Producte afegit", "success")
@@ -204,6 +235,8 @@ def add_item(order_id: int):
 @bp.route("/orders/<int:order_id>/items/bulk", methods=["POST"])
 def add_items_bulk(order_id: int):
     order = Order.query.get_or_404(order_id)
+    prev_fulfillment = order.fulfillment_status
+    prev_payment = order.payment_status
     added_items = 0
     for key, value in request.form.items():
         if not key.startswith("quantity_"):
@@ -238,6 +271,13 @@ def add_items_bulk(order_id: int):
         order.fulfillment_status = FulfillmentStatus.PENDING_DELIVERY
         order.payment_status = PaymentStatus.PENDING_PAYMENT
         order.sync_legacy_status()
+        log_order_status_change(
+            order,
+            prev_fulfillment,
+            prev_payment,
+            actor_name="dashboard",
+            details={"source": "dashboard/add_items_bulk", "added_items": added_items},
+        )
         db.session.commit()
         emit_order_update(order)
         flash(f"Afegits {added_items} articles", "success")
@@ -250,14 +290,22 @@ def add_items_bulk(order_id: int):
 @bp.route("/orders/<int:order_id>/items/<int:item_id>/status", methods=["POST"])
 def update_item_status(order_id: int, item_id: int):
     order = Order.query.get_or_404(order_id)
+    prev_fulfillment = order.fulfillment_status
+    prev_payment = order.payment_status
     item = OrderItem.query.get_or_404(item_id)
     status = request.form.get("status")
     try:
         item.status = OrderItemStatus(status)
     except ValueError:
         abort(400)
-    db.session.commit()
     order.recalc_status()
+    log_order_status_change(
+        order,
+        prev_fulfillment,
+        prev_payment,
+        actor_name="dashboard",
+        details={"source": "dashboard/update_item_status", "item_id": item.id, "status": status},
+    )
     db.session.commit()
     emit_order_update(order)
     flash("Estat actualitzat", "success")
@@ -267,6 +315,8 @@ def update_item_status(order_id: int, item_id: int):
 @bp.route("/orders/<int:order_id>/status", methods=["POST"])
 def update_order_status(order_id: int):
     order = Order.query.get_or_404(order_id)
+    prev_fulfillment = order.fulfillment_status
+    prev_payment = order.payment_status
     fulfillment_value = request.form.get("fulfillment_status")
     payment_value = request.form.get("payment_status")
     try:
@@ -277,6 +327,13 @@ def update_order_status(order_id: int):
     except ValueError:
         abort(400)
     order.sync_legacy_status()
+    log_order_status_change(
+        order,
+        prev_fulfillment,
+        prev_payment,
+        actor_name="dashboard",
+        details={"source": "dashboard/update_order_status"},
+    )
     db.session.commit()
     emit_order_update(order)
     flash("Comanda actualitzada", "success")
@@ -286,6 +343,8 @@ def update_order_status(order_id: int):
 @bp.route("/orders/<int:order_id>/payments", methods=["POST"])
 def add_payment(order_id: int):
     order = Order.query.get_or_404(order_id)
+    prev_fulfillment = order.fulfillment_status
+    prev_payment = order.payment_status
     method = request.form.get("method", PaymentMethod.CASH.value)
     item_ids = [int(item_id) for item_id in request.form.getlist("item_ids")]
     note = request.form.get("note", "")
@@ -322,6 +381,17 @@ def add_payment(order_id: int):
         db.session.add(PaymentItem(payment_id=payment.id, order_item_id=item.id))
 
     order.recalc_status()
+    log_order_status_change(
+        order,
+        prev_fulfillment,
+        prev_payment,
+        actor_name="dashboard",
+        details={
+            "source": "dashboard/add_payment",
+            "amount": amount,
+            "method": method,
+        },
+    )
     db.session.commit()
     emit_order_update(order)
     flash("Pagament registrat", "success")

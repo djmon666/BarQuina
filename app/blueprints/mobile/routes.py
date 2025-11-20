@@ -20,6 +20,7 @@ from ...models import (
 )
 from ...realtime import emit_order_update
 from ...extras_utils import apply_extras_to_item, collect_extra_counts
+from ...audit_utils import log_order_event, log_order_status_change
 
 bp = Blueprint("mobile", __name__, url_prefix="/mobile")
 
@@ -156,6 +157,13 @@ def create_order(table_id: int):
     order = Order(table_id=table.id, created_by=user)
     order.sync_legacy_status()
     db.session.add(order)
+    db.session.flush()
+    log_order_event(
+        order,
+        "order_created",
+        staff_user=user,
+        details={"source": "mobile", "table": table.name},
+    )
     db.session.commit()
     emit_order_update(order)
     flash(f"Nova comanda #{order.id} creada", "success")
@@ -169,6 +177,8 @@ def add_items(order_id: int):
         return redirect(url_for("mobile.landing"))
 
     order = Order.query.get_or_404(order_id)
+    prev_fulfillment = order.fulfillment_status
+    prev_payment = order.payment_status
     if order.payment_status == PaymentStatus.PAID:
         flash("Aquesta comanda ja està cobrada", "danger")
         return redirect(url_for("mobile.table_orders", table_id=order.table_id))
@@ -251,6 +261,13 @@ def add_items(order_id: int):
 
     if added_items:
         order.recalc_status()
+        log_order_status_change(
+            order,
+            prev_fulfillment,
+            prev_payment,
+            staff_user=user,
+            details={"source": "mobile/add_items", "added_items": added_items},
+        )
         db.session.commit()
         emit_order_update(order)
         flash(f"Afegits {added_items} articles", "success")
@@ -267,6 +284,8 @@ def update_item(order_id: int, item_id: int):
         return redirect(url_for("mobile.landing"))
 
     order = Order.query.get_or_404(order_id)
+    prev_fulfillment = order.fulfillment_status
+    prev_payment = order.payment_status
     item = OrderItem.query.get_or_404(item_id)
     if item.order_id != order.id:
         flash("La línia no pertany a aquesta comanda", "danger")
@@ -296,6 +315,17 @@ def update_item(order_id: int, item_id: int):
         item.quantity = quantity
 
     order.recalc_status()
+    log_order_status_change(
+        order,
+        prev_fulfillment,
+        prev_payment,
+        staff_user=user,
+        details={
+            "source": "mobile/update_item",
+            "item_id": item.id,
+            "new_quantity": quantity,
+        },
+    )
     db.session.commit()
     emit_order_update(order)
     return redirect(url_for("mobile.table_orders", table_id=order.table_id, order_id=order.id))
@@ -308,6 +338,8 @@ def toggle_item_served(order_id: int, item_id: int):
         return redirect(url_for("mobile.landing"))
 
     order = Order.query.get_or_404(order_id)
+    prev_fulfillment = order.fulfillment_status
+    prev_payment = order.payment_status
 
     item = OrderItem.query.get_or_404(item_id)
     if item.order_id != order.id:
@@ -330,6 +362,13 @@ def toggle_item_served(order_id: int, item_id: int):
     else:
         item.status = next_status
     order.recalc_status()
+    log_order_status_change(
+        order,
+        prev_fulfillment,
+        prev_payment,
+        staff_user=user,
+        details={"source": "mobile/toggle_item_served", "item_id": item.id},
+    )
     db.session.commit()
     emit_order_update(order)
 

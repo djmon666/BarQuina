@@ -20,7 +20,9 @@ from typing import Any
 from app.models import (
     Category,
     Extra,
+    FulfillmentStatus,
     Order,
+    OrderAuditLog,
     OrderItem,
     OrderItemExtra,
     OrderItemStatus,
@@ -391,3 +393,50 @@ def test_mobile_add_items_mixed_payload_and_quantities(client):
         quantities = {item.product_id: item.quantity for item in refreshed.items}
         assert quantities.get(food_product_id) == 1
         assert quantities.get(drink_product_id) == 2
+
+
+def test_order_audit_logs_creation_and_status_change(client):
+    with client.application.app_context():
+        staff = StaffUser(name="Audit", is_active=True)
+        table = Table(name="Taula Audit", seats=4)
+        category = _get_category("Audit Cat", sort_order=5)
+        product = Product(name="Audit Drink", price=2.5, category=category)
+        db.session.add_all([staff, table, product])
+        db.session.commit()
+        staff_id = staff.id
+        staff_name = staff.name
+        table_id = table.id
+        product_id = product.id
+
+    _login_mobile_user(client, staff_id, staff_name)
+    create_resp = client.post(f"/mobile/tables/{table_id}/orders")
+    assert create_resp.status_code == 302
+
+    with client.application.app_context():
+        order = Order.query.order_by(Order.id.desc()).first()
+        assert order is not None
+        order_id = order.id
+        logs = OrderAuditLog.query.filter_by(order_id=order_id).all()
+        assert logs
+        assert logs[0].action == "order_created"
+
+    payload = {f"quantity_{product_id}": "1"}
+    add_items_resp = client.post(f"/mobile/orders/{order_id}/add-items", data=payload)
+    assert add_items_resp.status_code == 302
+
+    status_resp = client.post(
+        f"/orders/{order_id}/status",
+        data={"fulfillment_status": FulfillmentStatus.SERVED.value},
+    )
+    assert status_resp.status_code == 302
+
+    with client.application.app_context():
+        logs = (
+            OrderAuditLog.query.filter_by(order_id=order_id)
+            .order_by(OrderAuditLog.created_at.asc())
+            .all()
+        )
+        assert any(log.action == "order_status_updated" for log in logs)
+        latest = logs[-1]
+        assert latest.action == "order_status_updated"
+        assert "fulfillment" in latest.details
