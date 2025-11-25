@@ -54,7 +54,7 @@
                 <span class="badge bg-secondary">Tancada</span>
                 {% endif %}
             </td>
-            <td class="d-flex gap-2">
+            <td class="d-flex flex-column gap-2">
                 {% if session.is_open %}
                 <form method="post" action="{{ url_for('cash.add_movement', session_id=session.id) }}" class="d-flex flex-wrap gap-2">
                     <input class="form-control form-control-sm" type="number" name="amount" step="0.01" placeholder="Import">
@@ -76,6 +76,7 @@
                     <button class="btn btn-sm btn-outline-secondary">Reobre</button>
                 </form>
                 {% endif %}
+                <button class="btn btn-sm btn-outline-dark" data-bs-toggle="modal" data-bs-target="#editSession{{ session.id }}">Edita</button>
             </td>
         </tr>
         {% else %}
@@ -84,6 +85,62 @@
     </tbody>
 </table>
 </div>
+
+{% for session in sessions %}
+<div class="modal fade" id="editSession{{ session.id }}" tabindex="-1" aria-labelledby="editSessionLabel{{ session.id }}">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{{ url_for('cash.edit_session', session_id=session.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editSessionLabel{{ session.id }}">Edita sessió #{{ session.id }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tanca"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-floating mb-3">
+                        <input class="form-control" name="opening_float" type="number" step="0.01" value="{{ '%.2f'|format(session.opening_float) }}" required>
+                        <label>Float inicial</label>
+                    </div>
+                    <div class="alert alert-light py-2 mb-3">
+                        <div class="small text-muted">Les vendes es calculen automàticament amb els cobraments en sessió.</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-floating">
+                            <input class="form-control" name="deposits_override" type="number" step="0.01" value="{% if session.deposits_override is not none %}{{ '%.2f'|format(session.deposits_override) }}{% endif %}" placeholder="Entrades manuals">
+                            <label>Entrades (manual)</label>
+                        </div>
+                        <div class="form-text">Deixa buit per seguir sumant moviments.</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-floating">
+                            <input class="form-control" name="withdrawals_override" type="number" step="0.01" value="{% if session.withdrawals_override is not none %}{{ '%.2f'|format(session.withdrawals_override) }}{% endif %}" placeholder="Sortides manuals">
+                            <label>Sortides (manual)</label>
+                        </div>
+                        <div class="form-text">Deixa buit per seguir sumant moviments.</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-floating">
+                            <input class="form-control" name="adjustments_override" type="number" step="0.01" value="{% if session.adjustments_override is not none %}{{ '%.2f'|format(session.adjustments_override) }}{% endif %}" placeholder="Ajustos manuals">
+                            <label>Ajustos (manual)</label>
+                        </div>
+                        <div class="form-text">Deixa buit per seguir sumant moviments.</div>
+                    </div>
+                    <div class="mb-0">
+                        <div class="form-floating">
+                            <input class="form-control" name="closing_amount" type="number" step="0.01" value="{% if session.closing_amount is not none %}{{ '%.2f'|format(session.closing_amount) }}{% endif %}" placeholder="Tancament">
+                            <label>Total tancament</label>
+                        </div>
+                        <div class="form-text">Deixa buit per restablir el valor.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel·la</button>
+                    <button class="btn btn-primary">Desa canvis</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
 
 <div class="modal fade" id="openSession" tabindex="-1">
     <div class="modal-dialog">

@@ -59,6 +59,46 @@ def reopen_session(session_id: int):
     return redirect(url_for("cash.sessions"))
 
 
+@bp.route("/sessions/<int:session_id>/edit", methods=["POST"])
+def edit_session(session_id: int):
+    session = CashSession.query.get_or_404(session_id)
+    try:
+        opening_float = _parse_amount(request.form.get("opening_float"), default=None)
+    except ValueError:
+        flash("Introdueix un fons inicial vàlid", "danger")
+        return redirect(url_for("cash.sessions"))
+    if opening_float is None:
+        flash("El fons inicial no pot quedar en blanc", "danger")
+        return redirect(url_for("cash.sessions"))
+
+    try:
+        closing_amount = _parse_amount(request.form.get("closing_amount"), default=None)
+    except ValueError:
+        flash("Introdueix un import final vàlid", "danger")
+        return redirect(url_for("cash.sessions"))
+
+    override_fields = (
+        ("deposits_override", "Entrades"),
+        ("withdrawals_override", "Sortides"),
+        ("adjustments_override", "Ajustos"),
+    )
+    override_values: dict[str, float | None] = {}
+    for field, label in override_fields:
+        try:
+            override_values[field] = _parse_amount(request.form.get(field), default=None)
+        except ValueError:
+            flash(f"Introdueix un valor vàlid per {label.lower()}", "danger")
+            return redirect(url_for("cash.sessions"))
+
+    session.opening_float = opening_float
+    session.closing_amount = closing_amount
+    for field, _ in override_fields:
+        setattr(session, field, override_values[field])
+    db.session.commit()
+    flash("Sessió actualitzada", "success")
+    return redirect(url_for("cash.sessions"))
+
+
 @bp.route("/sessions/<int:session_id>/movements", methods=["POST"])
 def add_movement(session_id: int):
     session = CashSession.query.get_or_404(session_id)

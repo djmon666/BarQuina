@@ -29,6 +29,8 @@ from app.models import (
     OrderItem,
     OrderItemExtra,
     OrderItemStatus,
+    Payment,
+    PaymentMethod,
     PaymentStatus,
     Product,
     ProductExtra,
@@ -506,6 +508,88 @@ def test_cash_session_can_be_reopened(client):
         assert refreshed.is_open is True
         assert refreshed.closing_amount is None
 
+
+def test_cash_session_sales_include_order_payments(client):
+    with client.application.app_context():
+        session = CashSession(opening_float=25.0)
+        db.session.add(session)
+        table = Table(name="Sessió", seats=2)
+        category = _get_category("Menjar Sessió", sort_order=5)
+        product = Product(name="Bocata Sessió", price=12.5, category=category)
+        db.session.add_all([table, product])
+        db.session.flush()
+        order = Order(table_id=table.id)
+        order.sync_legacy_status()
+        db.session.add(order)
+        db.session.flush()
+        item = OrderItem(order_id=order.id, product_id=product.id, quantity=1, unit_price=product.price)
+        db.session.add(item)
+        db.session.commit()
+        session_id = session.id
+        order_id = order.id
+        item_id = item.id
+        item_total = item.line_total()
+
+    response = client.post(
+        f"/orders/{order_id}/payments",
+        data={
+            "method": PaymentMethod.CASH.value,
+            "item_ids": [str(item_id)],
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+
+    with client.application.app_context():
+        refreshed_session = db.session.get(CashSession, session_id)
+        assert refreshed_session is not None
+        assert refreshed_session.automatic_sales_total == pytest.approx(item_total)
+        assert refreshed_session.total_sales == pytest.approx(item_total)
+        payment = Payment.query.filter_by(order_id=order_id).one()
+        assert payment.cash_session_id == session_id
+
+
+def test_cash_session_admin_edit_overrides_totals(client):
+    with client.application.app_context():
+        session = CashSession(opening_float=25.0)
+        db.session.add(session)
+        db.session.flush()
+        db.session.add_all(
+            [
+                CashMovement(session_id=session.id, movement_type=CashMovementType.DEPOSIT, amount=10.0),
+                CashMovement(session_id=session.id, movement_type=CashMovementType.WITHDRAWAL, amount=2.0),
+                CashMovement(session_id=session.id, movement_type=CashMovementType.ADJUSTMENT, amount=1.0),
+            ]
+        )
+        db.session.commit()
+        session_id = session.id
+
+    response = client.post(
+        f"/cash/sessions/{session_id}/edit",
+        data={
+            "opening_float": "50",
+            "deposits_override": "40",
+            "withdrawals_override": "",
+            "adjustments_override": "2.5",
+            "closing_amount": "95",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+
+    with client.application.app_context():
+        updated = db.session.get(CashSession, session_id)
+        assert updated is not None
+        assert updated.opening_float == pytest.approx(50)
+        assert updated.total_deposits == pytest.approx(40)
+        assert updated.deposits_override == pytest.approx(40)
+        # withdrawals override left blank, should fall back to movement total (2)
+        assert updated.withdrawals_override is None
+        assert updated.total_withdrawals == pytest.approx(2)
+        assert updated.total_adjustments == pytest.approx(2.5)
+        assert updated.closing_amount == pytest.approx(95)
+        expected = updated.expected_closing_amount
+        assert expected == pytest.approx(50 + updated.total_sales + 40 - 2 + 2.5)
 
 def test_cash_session_totals_and_expected_amount(client):
     with client.application.app_context():

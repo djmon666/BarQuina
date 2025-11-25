@@ -246,9 +246,11 @@ class Payment(db.Model):
     method = db.Column(db.Enum(PaymentMethod), default=PaymentMethod.CASH, nullable=False)
     note = db.Column(db.String(120))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    cash_session_id = db.Column(db.Integer, db.ForeignKey("cash_sessions.id"))
 
     order = db.relationship("Order", back_populates="payments")
     items = db.relationship("PaymentItem", back_populates="payment", cascade="all, delete-orphan")
+    cash_session = db.relationship("CashSession", back_populates="payments")
 
 
 class PaymentItem(db.Model):
@@ -271,8 +273,12 @@ class CashSession(db.Model):
     opening_float = db.Column(db.Float, nullable=False, default=0.0)
     closing_amount = db.Column(db.Float)
     is_open = db.Column(db.Boolean, default=True)
+    deposits_override = db.Column(db.Float)
+    withdrawals_override = db.Column(db.Float)
+    adjustments_override = db.Column(db.Float)
 
     movements = db.relationship("CashMovement", back_populates="session", cascade="all, delete-orphan")
+    payments = db.relationship("Payment", back_populates="cash_session")
 
     def _movement_total(self, movement_type: CashMovementType) -> float:
         return round(
@@ -280,21 +286,33 @@ class CashSession(db.Model):
             2,
         )
 
+    def _override_or_total(self, override_value: float | None, movement_type: CashMovementType) -> float:
+        if override_value is not None:
+            return round(override_value, 2)
+        return self._movement_total(movement_type)
+
+    def _payment_total(self) -> float:
+        return round(sum(payment.amount for payment in self.payments), 2)
+
+    @property
+    def automatic_sales_total(self) -> float:
+        return self._payment_total()
+
     @property
     def total_sales(self) -> float:
-        return self._movement_total(CashMovementType.SALE)
+        return round(self.automatic_sales_total + self._movement_total(CashMovementType.SALE), 2)
 
     @property
     def total_deposits(self) -> float:
-        return self._movement_total(CashMovementType.DEPOSIT)
+        return self._override_or_total(self.deposits_override, CashMovementType.DEPOSIT)
 
     @property
     def total_withdrawals(self) -> float:
-        return self._movement_total(CashMovementType.WITHDRAWAL)
+        return self._override_or_total(self.withdrawals_override, CashMovementType.WITHDRAWAL)
 
     @property
     def total_adjustments(self) -> float:
-        return self._movement_total(CashMovementType.ADJUSTMENT)
+        return self._override_or_total(self.adjustments_override, CashMovementType.ADJUSTMENT)
 
     @property
     def expected_closing_amount(self) -> float:

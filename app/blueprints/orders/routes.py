@@ -7,6 +7,7 @@ from sqlalchemy.orm import joinedload
 
 from ...extensions import db
 from ...models import (
+    CashSession,
     Category,
     FulfillmentStatus,
     Order,
@@ -372,6 +373,13 @@ def add_payment(order_id: int):
     amount = sum(item.line_total() for item in unpaid_items)
 
     payment = Payment(order_id=order.id, amount=amount, method=PaymentMethod(method), note=note)
+    active_session = (
+        CashSession.query.filter_by(is_open=True).order_by(CashSession.opened_at.desc()).first()
+    )
+    if active_session:
+        payment.cash_session = active_session
+    else:
+        flash("No hi ha cap sessió de caixa oberta; no s'incrementarà el resum de vendes", "warning")
     db.session.add(payment)
     db.session.flush()
 
