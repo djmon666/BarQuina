@@ -120,6 +120,34 @@ def assign_inventory_session(entry_id: int):
     return redirect(url_for("catalog.inventory"))
 
 
+@bp.route("/inventory/<int:entry_id>/edit", methods=["POST"])
+def edit_inventory(entry_id: int):
+    entry = InventoryEntry.query.get_or_404(entry_id)
+    entry.product_name = request.form.get("product_name", "").strip()
+    entry.category = request.form.get("category", "").strip() or "menjar"
+    entry.quantity = int(request.form.get("quantity", 1))
+    entry.unit_cost = float(request.form.get("unit_cost", 0))
+    entry.vendor = request.form.get("vendor", "")
+    session_id_raw = request.form.get("cash_session_id", "").strip()
+    entry.cash_session_id = int(session_id_raw) if session_id_raw else None
+    
+    if not entry.product_name or entry.unit_cost <= 0:
+        flash("Falten dades d'inventari", "danger")
+    else:
+        db.session.commit()
+        flash("Entrada actualitzada", "success")
+    return redirect(url_for("catalog.inventory"))
+
+
+@bp.route("/inventory/<int:entry_id>/delete", methods=["POST"])
+def delete_inventory(entry_id: int):
+    entry = InventoryEntry.query.get_or_404(entry_id)
+    db.session.delete(entry)
+    db.session.commit()
+    flash("Entrada esborrada", "success")
+    return redirect(url_for("catalog.inventory"))
+
+
 @bp.route("/extras", methods=["GET", "POST"])
 def extras():
     if request.method == "POST":

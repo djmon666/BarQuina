@@ -709,3 +709,60 @@ def test_cash_session_net_profit_calculation(client):
         assert refreshed.movement_net_total == pytest.approx(120.0)
         assert refreshed.inventory_costs == pytest.approx(35.0)
         assert refreshed.net_profit == pytest.approx(85.0)
+
+
+def test_inventory_entry_can_be_edited(client):
+    with client.application.app_context():
+        entry = InventoryEntry(
+            product_name="Original",
+            category="menjar",
+            quantity=10,
+            unit_cost=5.0,
+        )
+        db.session.add(entry)
+        db.session.commit()
+        entry_id = entry.id
+
+    response = client.post(
+        f"/catalog/inventory/{entry_id}/edit",
+        data={
+            "product_name": "Actualitzat",
+            "category": "beguda",
+            "quantity": "15",
+            "unit_cost": "3.5",
+            "vendor": "Nou proveïdor",
+            "cash_session_id": "",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+
+    with client.application.app_context():
+        updated = db.session.get(InventoryEntry, entry_id)
+        assert updated is not None
+        assert updated.product_name == "Actualitzat"
+        assert updated.category == "beguda"
+        assert updated.quantity == 15
+        assert updated.unit_cost == pytest.approx(3.5)
+        assert updated.vendor == "Nou proveïdor"
+        assert updated.total_cost == pytest.approx(52.5)
+
+
+def test_inventory_entry_can_be_deleted(client):
+    with client.application.app_context():
+        entry = InventoryEntry(
+            product_name="To Delete",
+            category="menjar",
+            quantity=5,
+            unit_cost=2.0,
+        )
+        db.session.add(entry)
+        db.session.commit()
+        entry_id = entry.id
+
+    response = client.post(f"/catalog/inventory/{entry_id}/delete", follow_redirects=True)
+    assert response.status_code == 200
+
+    with client.application.app_context():
+        deleted = db.session.get(InventoryEntry, entry_id)
+        assert deleted is None

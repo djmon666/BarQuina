@@ -27,7 +27,11 @@
                 {% endif %}
             </td>
             <td>
-                <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#assignSession{{ entry.id }}">Assigna</button>
+                <div class="btn-group" role="group">
+                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editEntry{{ entry.id }}">Edita</button>
+                    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#assignSession{{ entry.id }}">Assigna</button>
+                    <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteEntry{{ entry.id }}">Esborra</button>
+                </div>
             </td>
         </tr>
         {% else %}
@@ -38,6 +42,56 @@
 </div>
 
 {% for entry in entries %}
+<div class="modal fade" id="editEntry{{ entry.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{{ url_for('catalog.edit_inventory', entry_id=entry.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title">Editar entrada d'inventari</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-floating mb-3">
+                        <input class="form-control" name="product_name" value="{{ entry.product_name }}" required>
+                        <label>Producte</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <input class="form-control" name="category" value="{{ entry.category }}">
+                        <label>Categoria</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <input class="form-control" name="quantity" type="number" min="1" value="{{ entry.quantity }}" required>
+                        <label>Quantitat</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <input class="form-control" name="unit_cost" type="number" min="0" step="0.01" value="{{ '%.2f'|format(entry.unit_cost) }}" required>
+                        <label>Cost unitari</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <input class="form-control" name="vendor" value="{{ entry.vendor or '' }}">
+                        <label>Proveïdor</label>
+                    </div>
+                    <div class="form-floating">
+                        <select class="form-select" name="cash_session_id">
+                            <option value="">Sense assignar</option>
+                            {% for session in sessions %}
+                            <option value="{{ session.id }}" {% if entry.cash_session_id == session.id %}selected{% endif %}>
+                                #{{ session.id }} - {{ session.opened_at.strftime('%d/%m %H:%M') }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <label>Sessió de caixa</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel·la</button>
+                    <button class="btn btn-primary">Desa canvis</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="assignSession{{ entry.id }}" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -63,6 +117,31 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel·la</button>
                     <button class="btn btn-primary">Desa</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="deleteEntry{{ entry.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{{ url_for('catalog.delete_inventory', entry_id=entry.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title">Esborrar entrada</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Estàs segur que vols esborrar aquesta entrada d'inventari?</p>
+                    <div class="alert alert-warning">
+                        <strong>{{ entry.product_name }}</strong><br>
+                        Quantitat: {{ entry.quantity }}<br>
+                        Cost total: € {{ '%.2f'|format(entry.total_cost) }}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel·la</button>
+                    <button class="btn btn-danger">Esborra</button>
                 </div>
             </form>
         </div>
