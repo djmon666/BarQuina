@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from flask import Blueprint, flash, redirect, render_template, url_for
+from flask_login import login_required
 from sqlalchemy.orm import joinedload
 
 from ...extensions import db
@@ -8,6 +9,12 @@ from ...models import FulfillmentStatus, Order, OrderItem, OrderItemStatus
 from ...realtime import emit_order_update
 
 bp = Blueprint("kitchen", __name__, url_prefix="/kitchen")
+
+
+@bp.before_request
+@login_required
+def require_login():
+    pass
 
 
 def _pending_order_groups() -> list[tuple[Order, list[OrderItem]]]:

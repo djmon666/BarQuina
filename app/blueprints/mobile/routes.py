@@ -4,6 +4,7 @@ import json
 from collections import defaultdict
 
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+from flask_login import login_required
 from sqlalchemy.orm import joinedload
 
 from ...extensions import db
@@ -23,6 +24,12 @@ from ...extras_utils import apply_extras_to_item, collect_extra_counts
 from ...audit_utils import log_order_event, log_order_status_change
 
 bp = Blueprint("mobile", __name__, url_prefix="/mobile")
+
+
+@bp.before_request
+@login_required
+def require_login():
+    pass
 
 
 def _current_user() -> StaffUser | None:

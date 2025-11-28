@@ -48,6 +48,7 @@ class TestConfig(Config):
 def client(tmp_path):
     TestConfig.SQLALCHEMY_DATABASE_URI = f"sqlite:///{tmp_path / 'test.db'}"
     TestConfig.SECRET_KEY = "test"
+    TestConfig.LOGIN_DISABLED = True  # Disable authentication for tests
 
     app = create_app(TestConfig)
 

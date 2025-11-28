@@ -3,7 +3,7 @@ from __future__ import annotations
 from flask import Flask
 
 from .config import Config
-from .extensions import db, migrate, socketio
+from .extensions import db, login_manager, migrate, socketio
 from .schema_utils import ensure_legacy_schema
 
 
@@ -14,9 +14,19 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     db.init_app(app)
     migrate.init_app(app, db)
     socketio.init_app(app, cors_allowed_origins="*")
+    login_manager.init_app(app)
+    login_manager.login_view = "auth.login"
+    login_manager.login_message = "Cal iniciar sessió per accedir a aquesta pàgina."
+    
+    @login_manager.user_loader
+    def load_user(user_id: str):
+        from .models import StaffUser
+        return StaffUser.query.get(int(user_id))
+    
     with app.app_context():
         ensure_legacy_schema()
 
+    from .blueprints.auth.routes import bp as auth_bp
     from .blueprints.dashboard.routes import bp as dashboard_bp
     from .blueprints.catalog.routes import bp as catalog_bp
     from .blueprints.orders.routes import bp as orders_bp
@@ -26,6 +36,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     from .blueprints.kitchen.routes import bp as kitchen_bp
     from .blueprints.reports.routes import bp as reports_bp
 
+    app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(catalog_bp, url_prefix="/catalog")
     app.register_blueprint(orders_bp)

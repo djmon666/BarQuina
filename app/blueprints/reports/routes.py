@@ -5,10 +5,17 @@ from collections import defaultdict
 from flask import Blueprint, render_template
 from sqlalchemy import func
 
+from ...auth_utils import admin_required
 from ...extensions import db
 from ...models import CashSession, OrderItem, Payment
 
 bp = Blueprint("reports", __name__, url_prefix="/reports")
+
+
+@bp.before_request
+@admin_required
+def require_admin():
+    pass
 
 
 @bp.route("/")

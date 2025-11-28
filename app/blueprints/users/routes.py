@@ -2,10 +2,17 @@ from __future__ import annotations
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
+from ...auth_utils import admin_required
 from ...extensions import db
 from ...models import StaffUser
 
 bp = Blueprint("users", __name__, url_prefix="/users")
+
+
+@bp.before_request
+@admin_required
+def require_admin():
+    pass
 
 
 @bp.route("/", methods=["GET", "POST"])

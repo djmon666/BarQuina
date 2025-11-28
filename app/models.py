@@ -3,7 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 
+from flask_login import UserMixin
 from sqlalchemy.orm import validates
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from .extensions import db
 
@@ -52,6 +54,11 @@ class CashMovementType(str, Enum):
     DEPOSIT = "entrada"
     WITHDRAWAL = "sortida"
     ADJUSTMENT = "ajust"
+
+
+class UserRole(str, Enum):
+    ADMIN = "admin"
+    STAFF = "staff"
 
 
 class Table(db.Model):
@@ -150,14 +157,32 @@ class InventoryEntry(db.Model):
         return round(self.quantity * self.unit_cost, 2)
 
 
-class StaffUser(db.Model):
+class StaffUser(UserMixin, db.Model):
     __tablename__ = "staff_users"
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(60), unique=True, nullable=False)
     is_active = db.Column(db.Boolean, default=True)
+    role = db.Column(db.Enum(UserRole), default=UserRole.STAFF, nullable=False)
+    password_hash = db.Column(db.String(255))
 
     orders = db.relationship("Order", back_populates="created_by")
+
+    @property
+    def username(self) -> str:
+        """Alias for Flask-Login compatibility."""
+        return self.name
+
+    def set_password(self, password: str) -> None:
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password: str) -> bool:
+        if not self.password_hash:
+            return False
+        return check_password_hash(self.password_hash, password)
+
+    def is_admin(self) -> bool:
+        return self.role == UserRole.ADMIN
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"StaffUser({self.name})"

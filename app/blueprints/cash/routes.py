@@ -2,10 +2,17 @@ from __future__ import annotations
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
+from ...auth_utils import admin_required
 from ...extensions import db
 from ...models import CashMovement, CashMovementType, CashSession
 
 bp = Blueprint("cash", __name__)
+
+
+@bp.before_request
+@admin_required
+def require_admin():
+    pass
 
 
 def _parse_amount(raw_value: str | None, default: float = 0.0) -> float:

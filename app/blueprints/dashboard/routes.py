@@ -3,9 +3,16 @@ from __future__ import annotations
 from flask import Blueprint, render_template
 from sqlalchemy import and_, or_
 
+from ...auth_utils import admin_required
 from ...models import CashSession, FulfillmentStatus, Order, PaymentStatus, Table
 
 bp = Blueprint("dashboard", __name__)
+
+
+@bp.before_request
+@admin_required
+def require_admin():
+    pass
 
 
 @bp.route("/")

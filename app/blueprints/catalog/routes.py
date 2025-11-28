@@ -4,10 +4,17 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
+from ...auth_utils import admin_required
 from ...extensions import db
 from ...models import Category, Extra, InventoryEntry, Product, ProductExtra
 
 bp = Blueprint("catalog", __name__)
+
+
+@bp.before_request
+@admin_required
+def require_admin():
+    pass
 
 
 def _ordered_categories(include_inactive: bool = False) -> list[Category]:

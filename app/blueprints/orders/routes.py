@@ -5,6 +5,7 @@ from collections import defaultdict
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from sqlalchemy.orm import joinedload
 
+from ...auth_utils import admin_required
 from ...extensions import db
 from ...models import (
     CashSession,
@@ -26,6 +27,12 @@ from ...extras_utils import apply_extras_to_item, collect_extra_counts
 from ...audit_utils import log_order_event, log_order_status_change
 
 bp = Blueprint("orders", __name__, url_prefix="")
+
+
+@bp.before_request
+@admin_required
+def require_admin():
+    pass
 
 
 def _get_or_create_open_order(table: Table) -> Order:
