@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from functools import wraps
 
-from flask import abort, current_app
+from flask import abort, current_app, redirect, url_for, flash
 from flask_login import current_user
 
 
@@ -15,8 +15,10 @@ def admin_required(f):
             return f(*args, **kwargs)
         
         if not current_user.is_authenticated:
-            abort(401)
+            flash("Cal iniciar sessió per accedir a aquesta pàgina.", "warning")
+            return redirect(url_for("auth.login"))
         if not current_user.is_admin():
+            flash("No tens permisos d'administrador.", "danger")
             abort(403)
         return f(*args, **kwargs)
     return decorated_function

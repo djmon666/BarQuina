@@ -16,9 +16,9 @@
     <div class="container-fluid">
         <a class="navbar-brand" href="{{ url_for('mobile.tables') }}">Terminal Mòbil</a>
         <div class="d-flex gap-2 align-items-center">
-            {% if session.get('mobile_user_name') %}
-                <span class="text-white-50 small">{{ session['mobile_user_name'] }}</span>
-                <a class="btn btn-sm btn-outline-light" href="{{ url_for('mobile.logout') }}">Sortir</a>
+            {% if current_user.is_authenticated %}
+                <span class="text-white-50 small">{{ current_user.username }}</span>
+                <a class="btn btn-sm btn-outline-light" href="{{ url_for('auth.logout') }}">Tancar sessió</a>
             {% endif %}
         </div>
     </div>

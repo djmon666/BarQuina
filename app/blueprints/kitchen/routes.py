@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from flask import Blueprint, flash, redirect, render_template, url_for
-from flask_login import login_required
+from flask_login import current_user
 from sqlalchemy.orm import joinedload
 
 from ...extensions import db
@@ -12,9 +12,13 @@ bp = Blueprint("kitchen", __name__, url_prefix="/kitchen")
 
 
 @bp.before_request
-@login_required
 def require_login():
-    pass
+    from flask import current_app
+    if current_app.config.get("LOGIN_DISABLED", False):
+        return
+    if not current_user.is_authenticated:
+        flash("Cal iniciar sessió per accedir a aquesta pàgina.", "warning")
+        return redirect(url_for("auth.login"))
 
 
 def _pending_order_groups() -> list[tuple[Order, list[OrderItem]]]:

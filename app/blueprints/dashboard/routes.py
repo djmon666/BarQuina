@@ -1,18 +1,25 @@
 from __future__ import annotations
 
-from flask import Blueprint, render_template
+from flask import Blueprint, flash, redirect, render_template, url_for
+from flask_login import current_user
 from sqlalchemy import and_, or_
 
-from ...auth_utils import admin_required
 from ...models import CashSession, FulfillmentStatus, Order, PaymentStatus, Table
 
 bp = Blueprint("dashboard", __name__)
 
 
 @bp.before_request
-@admin_required
 def require_admin():
-    pass
+    from flask import current_app
+    if current_app.config.get("LOGIN_DISABLED", False):
+        return
+    if not current_user.is_authenticated:
+        flash("Cal iniciar sessió per accedir a aquesta pàgina.", "warning")
+        return redirect(url_for("auth.login"))
+    if not current_user.is_admin():
+        flash("No tens permisos d'administrador.", "danger")
+        return redirect(url_for("auth.login"))
 
 
 @bp.route("/")
