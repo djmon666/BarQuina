@@ -141,6 +141,13 @@ class InventoryEntry(db.Model):
     unit_cost = db.Column(db.Float, nullable=False)
     vendor = db.Column(db.String(80))
     purchased_at = db.Column(db.DateTime, default=datetime.utcnow)
+    cash_session_id = db.Column(db.Integer, db.ForeignKey("cash_sessions.id"))
+
+    cash_session = db.relationship("CashSession", back_populates="inventory_entries")
+
+    @property
+    def total_cost(self) -> float:
+        return round(self.quantity * self.unit_cost, 2)
 
 
 class StaffUser(db.Model):
@@ -279,6 +286,7 @@ class CashSession(db.Model):
 
     movements = db.relationship("CashMovement", back_populates="session", cascade="all, delete-orphan")
     payments = db.relationship("Payment", back_populates="cash_session")
+    inventory_entries = db.relationship("InventoryEntry", back_populates="cash_session")
 
     def _movement_total(self, movement_type: CashMovementType) -> float:
         return round(
@@ -335,6 +343,14 @@ class CashSession(db.Model):
     def movement_net_total(self) -> float:
         total = self.total_sales + self.total_deposits - self.total_withdrawals + self.total_adjustments
         return round(total, 2)
+
+    @property
+    def inventory_costs(self) -> float:
+        return round(sum(entry.total_cost for entry in self.inventory_entries), 2)
+
+    @property
+    def net_profit(self) -> float:
+        return round(self.movement_net_total - self.inventory_costs, 2)
 
 
 class CashMovement(db.Model):

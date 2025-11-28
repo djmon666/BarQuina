@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Resultats per Sessió</h1>
+</div>
+
+{% for stat in session_stats %}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+            <strong>Sessió #{{ stat.session.id }}</strong>
+            <span class="badge {% if stat.session.is_open %}bg-success{% else %}bg-secondary{% endif %} ms-2">
+                {% if stat.session.is_open %}Oberta{% else %}Tancada{% endif %}
+            </span>
+        </div>
+        <small class="text-muted">
+            {{ stat.session.opened_at.strftime('%d/%m/%Y %H:%M') }}
+            {% if stat.session.closed_at %}
+            - {{ stat.session.closed_at.strftime('%d/%m/%Y %H:%M') }}
+            {% endif %}
+        </small>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h5>Productes venuts</h5>
+                {% if stat.products_sold %}
+                <ul class="list-group list-group-flush">
+                    {% for product in stat.products_sold %}
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>{{ product.name }}</span>
+                        <span class="badge bg-primary">{{ product.quantity }} u.</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted">Cap venda registrada</p>
+                {% endif %}
+            </div>
+            <div class="col-md-6">
+                <h5>Resum financer</h5>
+                <table class="table table-sm">
+                    <tbody>
+                        <tr>
+                            <td><strong>Ingressos (mov. net)</strong></td>
+                            <td class="text-end">€ {{ '%.2f'|format(stat.revenue) }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Costos inventari</strong></td>
+                            <td class="text-end text-danger">€ {{ '%.2f'|format(stat.costs) }}</td>
+                        </tr>
+                        <tr class="table-active">
+                            <td><strong>Benefici net</strong></td>
+                            <td class="text-end fw-bold {% if stat.profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                € {{ '%.2f'|format(stat.profit) }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                {% if stat.session.inventory_entries %}
+                <details class="mt-3">
+                    <summary class="text-muted" style="cursor: pointer;">Detall inventari ({{ stat.session.inventory_entries|length }} entrades)</summary>
+                    <ul class="list-group list-group-flush mt-2">
+                        {% for entry in stat.session.inventory_entries %}
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>{{ entry.product_name }} (x{{ entry.quantity }})</span>
+                            <span>€ {{ '%.2f'|format(entry.total_cost) }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </details>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-info">Encara no hi ha sessions amb dades.</div>
+{% endfor %}
+{% endblock %}

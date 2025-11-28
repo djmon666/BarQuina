@@ -85,12 +85,15 @@ def toggle_product(product_id: int):
 @bp.route("/inventory", methods=["GET", "POST"])
 def inventory():
     if request.method == "POST":
+        session_id_raw = request.form.get("cash_session_id", "").strip()
+        session_id = int(session_id_raw) if session_id_raw else None
         entry = InventoryEntry(
             product_name=request.form.get("product_name", "").strip(),
             category=request.form.get("category", "").strip() or "menjar",
             quantity=int(request.form.get("quantity", 1)),
             unit_cost=float(request.form.get("unit_cost", 0)),
             vendor=request.form.get("vendor", ""),
+            cash_session_id=session_id,
         )
         if not entry.product_name or entry.unit_cost <= 0:
             flash("Falten dades d'inventari", "danger")
@@ -100,8 +103,21 @@ def inventory():
             flash("Compra registrada", "success")
         return redirect(url_for("catalog.inventory"))
 
+    from ...models import CashSession
+
     entries = InventoryEntry.query.order_by(InventoryEntry.purchased_at.desc()).limit(50).all()
-    return render_template("catalog/inventory.html", entries=entries)
+    sessions = CashSession.query.order_by(CashSession.opened_at.desc()).limit(20).all()
+    return render_template("catalog/inventory.html", entries=entries, sessions=sessions)
+
+
+@bp.route("/inventory/<int:entry_id>/assign-session", methods=["POST"])
+def assign_inventory_session(entry_id: int):
+    entry = InventoryEntry.query.get_or_404(entry_id)
+    session_id_raw = request.form.get("cash_session_id", "").strip()
+    entry.cash_session_id = int(session_id_raw) if session_id_raw else None
+    db.session.commit()
+    flash("Sessió actualitzada", "success")
+    return redirect(url_for("catalog.inventory"))
 
 
 @bp.route("/extras", methods=["GET", "POST"])

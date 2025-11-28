@@ -7,7 +7,7 @@
 <div class="table-responsive">
 <table class="table table-hover">
     <thead>
-        <tr><th>Producte</th><th>Categoria</th><th>Quantitat</th><th>Cost unitari</th><th>Proveïdor</th><th>Data</th></tr>
+        <tr><th>Producte</th><th>Categoria</th><th>Quantitat</th><th>Cost unitari</th><th>Total</th><th>Proveïdor</th><th>Data</th><th>Sessió</th><th></th></tr>
     </thead>
     <tbody>
         {% for entry in entries %}
@@ -16,15 +16,59 @@
             <td>{{ entry.category }}</td>
             <td>{{ entry.quantity }}</td>
             <td>€ {{ '%.2f'|format(entry.unit_cost) }}</td>
+            <td>€ {{ '%.2f'|format(entry.total_cost) }}</td>
             <td>{{ entry.vendor or '-' }}</td>
             <td>{{ entry.purchased_at.strftime('%d/%m %H:%M') }}</td>
+            <td>
+                {% if entry.cash_session_id %}
+                <span class="badge bg-info">#{{ entry.cash_session_id }}</span>
+                {% else %}
+                <span class="text-muted">—</span>
+                {% endif %}
+            </td>
+            <td>
+                <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#assignSession{{ entry.id }}">Assigna</button>
+            </td>
         </tr>
         {% else %}
-        <tr><td colspan="6">Encara no hi ha compres.</td></tr>
+        <tr><td colspan="9">Encara no hi ha compres.</td></tr>
         {% endfor %}
     </tbody>
 </table>
 </div>
+
+{% for entry in entries %}
+<div class="modal fade" id="assignSession{{ entry.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{{ url_for('catalog.assign_inventory_session', entry_id=entry.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title">Assignar sessió: {{ entry.product_name }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-floating">
+                        <select class="form-select" name="cash_session_id">
+                            <option value="">Sense assignar</option>
+                            {% for session in sessions %}
+                            <option value="{{ session.id }}" {% if entry.cash_session_id == session.id %}selected{% endif %}>
+                                #{{ session.id }} - {{ session.opened_at.strftime('%d/%m %H:%M') }}
+                                {% if session.is_open %}(Oberta){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <label>Sessió de caixa</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel·la</button>
+                    <button class="btn btn-primary">Desa</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
 
 <div class="modal fade" id="newEntry" tabindex="-1">
     <div class="modal-dialog">
@@ -48,9 +92,21 @@
                         <input class="form-control" name="unit_cost" type="number" min="0" step="0.01" placeholder="10">
                         <label>Cost unitari</label>
                     </div>
-                    <div class="form-floating">
+                    <div class="form-floating mb-3">
                         <input class="form-control" name="vendor" placeholder="Proveïdor">
                         <label>Proveïdor</label>
+                    </div>
+                    <div class="form-floating">
+                        <select class="form-select" name="cash_session_id">
+                            <option value="">Sense assignar</option>
+                            {% for session in sessions %}
+                            <option value="{{ session.id }}">
+                                #{{ session.id }} - {{ session.opened_at.strftime('%d/%m %H:%M') }}
+                                {% if session.is_open %}(Oberta){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <label>Sessió de caixa (opcional)</label>
                     </div>
                 </div>
                 <div class="modal-footer">

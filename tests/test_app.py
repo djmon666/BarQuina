@@ -24,6 +24,7 @@ from app.models import (
     CashSession,
     Extra,
     FulfillmentStatus,
+    InventoryEntry,
     Order,
     OrderAuditLog,
     OrderItem,
@@ -642,3 +643,69 @@ def test_cash_sessions_page_displays_movement_net_and_difference(client):
     assert "€ 12.75" in html
     assert "€ 53.98" in html
     assert "€ -1.48" in html
+
+
+def test_inventory_entry_links_to_cash_session(client):
+    with client.application.app_context():
+        session = CashSession(opening_float=100.0)
+        db.session.add(session)
+        db.session.commit()
+        session_id = session.id
+
+    response = client.post(
+        "/catalog/inventory",
+        data={
+            "product_name": "Pa de motlle",
+            "category": "menjar",
+            "quantity": "10",
+            "unit_cost": "2.5",
+            "vendor": "Forn local",
+            "cash_session_id": str(session_id),
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+
+    with client.application.app_context():
+        entry = InventoryEntry.query.filter_by(product_name="Pa de motlle").first()
+        assert entry is not None
+        assert entry.cash_session_id == session_id
+        assert entry.total_cost == pytest.approx(25.0)
+        refreshed_session = db.session.get(CashSession, session_id)
+        assert refreshed_session.inventory_costs == pytest.approx(25.0)
+
+
+def test_cash_session_net_profit_calculation(client):
+    with client.application.app_context():
+        session = CashSession(opening_float=50.0)
+        db.session.add(session)
+        db.session.flush()
+        db.session.add_all(
+            [
+                CashMovement(session_id=session.id, movement_type=CashMovementType.SALE, amount=100.0),
+                CashMovement(session_id=session.id, movement_type=CashMovementType.DEPOSIT, amount=20.0),
+                InventoryEntry(
+                    product_name="Ingredient A",
+                    category="menjar",
+                    quantity=5,
+                    unit_cost=3.0,
+                    cash_session_id=session.id,
+                ),
+                InventoryEntry(
+                    product_name="Ingredient B",
+                    category="menjar",
+                    quantity=2,
+                    unit_cost=10.0,
+                    cash_session_id=session.id,
+                ),
+            ]
+        )
+        db.session.commit()
+        session_id = session.id
+
+    with client.application.app_context():
+        refreshed = db.session.get(CashSession, session_id)
+        assert refreshed is not None
+        assert refreshed.movement_net_total == pytest.approx(120.0)
+        assert refreshed.inventory_costs == pytest.approx(35.0)
+        assert refreshed.net_profit == pytest.approx(85.0)
