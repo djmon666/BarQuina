@@ -14,7 +14,7 @@ def login():
     if current_user.is_authenticated:
         if current_user.is_admin():
             return redirect(url_for("dashboard.home"))
-        return redirect(url_for("mobile.login"))
+        return redirect(url_for("mobile.tables"))
 
     if request.method == "POST":
         username = request.form.get("username", "").strip()
@@ -27,7 +27,7 @@ def login():
             next_page = request.args.get("next")
             if user.is_admin():
                 return redirect(next_page if next_page else url_for("dashboard.home"))
-            return redirect(url_for("mobile.login"))
+            return redirect(url_for("mobile.tables"))
         
         flash("Usuari o contrasenya incorrectes", "danger")
     

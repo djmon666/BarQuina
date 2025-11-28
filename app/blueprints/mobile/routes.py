@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from collections import defaultdict
 
-from flask import Blueprint, flash, redirect, render_template, request, session, url_for
-from flask_login import login_required
+from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
 from sqlalchemy.orm import joinedload
 
 from ...extensions import db
@@ -32,21 +32,6 @@ def require_login():
     pass
 
 
-def _current_user() -> StaffUser | None:
-    user_id = session.get("mobile_user_id")
-    if not user_id:
-        return None
-    return db.session.get(StaffUser, user_id)
-
-
-def _require_user() -> StaffUser | None:
-    user = _current_user()
-    if not user:
-        flash("Identifica't per continuar", "warning")
-        return None
-    return user
-
-
 def _active_orders(table_id: int) -> list[Order]:
     """Return orders that still requere servei at the table."""
     return (
@@ -58,42 +43,13 @@ def _active_orders(table_id: int) -> list[Order]:
 
 @bp.route("/")
 def landing():
-    if _current_user():
-        return redirect(url_for("mobile.tables"))
-
-    users = StaffUser.query.filter_by(is_active=True).order_by(StaffUser.name).all()
-    return render_template("mobile/login.html", users=users)
-
-
-@bp.route("/select-user", methods=["POST"])
-def select_user():
-    user_id = request.form.get("user_id", type=int)
-    user = db.session.get(StaffUser, user_id) if user_id else None
-    if not user or not user.is_active:
-        flash("Usuari invàlid", "danger")
-        return redirect(url_for("mobile.landing"))
-
-    session["mobile_user_id"] = user.id
-    session["mobile_user_name"] = user.name
-    flash(f"Sessió iniciada per {user.name}", "success")
     return redirect(url_for("mobile.tables"))
-
-
-@bp.route("/logout")
-def logout():
-    session.pop("mobile_user_id", None)
-    session.pop("mobile_user_name", None)
-    flash("Sessió finalitzada", "info")
-    return redirect(url_for("mobile.landing"))
 
 
 @bp.route("/tables")
 def tables():
-    user = _require_user()
-    if not user:
-        return redirect(url_for("mobile.landing"))
-
     table_list = Table.query.order_by(Table.name).all()
+    user = current_user if current_user.is_authenticated else None
     return render_template(
         "mobile/tables.html",
         user=user,
@@ -105,10 +61,6 @@ def tables():
 
 @bp.route("/tables/<int:table_id>")
 def table_orders(table_id: int):
-    user = _require_user()
-    if not user:
-        return redirect(url_for("mobile.landing"))
-
     table = Table.query.get_or_404(table_id)
     orders = _active_orders(table.id)
 
@@ -141,6 +93,7 @@ def table_orders(table_id: int):
             grouped[category.id].append(product)
         product_groups = [(category, grouped[category.id]) for category in categories]
 
+    user = current_user if current_user.is_authenticated else None
     return render_template(
         "mobile/order.html",
         user=user,
@@ -156,11 +109,8 @@ def table_orders(table_id: int):
 
 @bp.route("/tables/<int:table_id>/orders", methods=["POST"])
 def create_order(table_id: int):
-    user = _require_user()
-    if not user:
-        return redirect(url_for("mobile.landing"))
-
     table = Table.query.get_or_404(table_id)
+    user = current_user if current_user.is_authenticated else None
     order = Order(table_id=table.id, created_by=user)
     order.sync_legacy_status()
     db.session.add(order)
@@ -179,10 +129,6 @@ def create_order(table_id: int):
 
 @bp.route("/orders/<int:order_id>/add-items", methods=["POST"])
 def add_items(order_id: int):
-    user = _require_user()
-    if not user:
-        return redirect(url_for("mobile.landing"))
-
     order = Order.query.get_or_404(order_id)
     prev_fulfillment = order.fulfillment_status
     prev_payment = order.payment_status
@@ -268,6 +214,7 @@ def add_items(order_id: int):
 
     if added_items:
         order.recalc_status()
+        user = current_user if current_user.is_authenticated else None
         log_order_status_change(
             order,
             prev_fulfillment,
@@ -286,10 +233,6 @@ def add_items(order_id: int):
 
 @bp.route("/orders/<int:order_id>/items/<int:item_id>/update", methods=["POST"])
 def update_item(order_id: int, item_id: int):
-    user = _require_user()
-    if not user:
-        return redirect(url_for("mobile.landing"))
-
     order = Order.query.get_or_404(order_id)
     prev_fulfillment = order.fulfillment_status
     prev_payment = order.payment_status
@@ -322,6 +265,7 @@ def update_item(order_id: int, item_id: int):
         item.quantity = quantity
 
     order.recalc_status()
+    user = current_user if current_user.is_authenticated else None
     log_order_status_change(
         order,
         prev_fulfillment,
@@ -340,10 +284,6 @@ def update_item(order_id: int, item_id: int):
 
 @bp.route("/orders/<int:order_id>/items/<int:item_id>/toggle-served", methods=["POST"])
 def toggle_item_served(order_id: int, item_id: int):
-    user = _require_user()
-    if not user:
-        return redirect(url_for("mobile.landing"))
-
     order = Order.query.get_or_404(order_id)
     prev_fulfillment = order.fulfillment_status
     prev_payment = order.payment_status
@@ -369,6 +309,7 @@ def toggle_item_served(order_id: int, item_id: int):
     else:
         item.status = next_status
     order.recalc_status()
+    user = current_user if current_user.is_authenticated else None
     log_order_status_change(
         order,
         prev_fulfillment,

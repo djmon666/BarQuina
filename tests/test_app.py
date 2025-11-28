@@ -89,9 +89,8 @@ def test_homepage_loads(client):
 
 
 def test_mobile_page_loads(client):
-    response = client.get("/mobile/")
+    response = client.get("/mobile/tables")
     assert response.status_code == 200
-    assert b"Qui ets" in response.data
 
 
 def test_order_item_with_extras_affects_subtotal(client):

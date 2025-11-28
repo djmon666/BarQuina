@@ -27,12 +27,20 @@ def log_order_event(
     details: dict[str, Any] | None = None,
 ) -> OrderAuditLog:
     """Persist a generic order audit entry."""
+    
+    # Handle AnonymousUser case (when LOGIN_DISABLED in tests)
+    staff_id = None
+    staff_name = actor_name
+    
+    if staff_user and hasattr(staff_user, 'id'):
+        staff_id = staff_user.id
+        staff_name = actor_name or staff_user.name
 
     entry = OrderAuditLog(
         order_id=order.id,
         table_id=order.table_id,
-        staff_user_id=staff_user.id if staff_user else None,
-        actor_name=actor_name or (staff_user.name if staff_user else None),
+        staff_user_id=staff_id,
+        actor_name=staff_name,
         action=action,
         details=details or {},
     )
