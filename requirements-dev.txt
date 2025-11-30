@@ -1,0 +1,15 @@
+# Development and testing dependencies
+-r requirements.txt
+
+# Load testing
+locust==2.32.3
+
+# System monitoring
+psutil==6.1.0
+
+# Data analysis and visualization
+pandas>=2.0.0
+matplotlib>=3.7.0
+
+# Performance monitoring (optional)
+# py-spy==0.3.14
