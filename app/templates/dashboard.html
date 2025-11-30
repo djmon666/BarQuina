@@ -36,21 +36,27 @@
 <div class="row g-3">
     {% for table in tables %}
     <div class="col-sm-6 col-md-4 col-lg-3">
+        {% set active_orders = table.orders|rejectattr('is_closed')|list %}
         <a class="card text-decoration-none" href="{{ url_for('orders.table_detail', table_id=table.id) }}">
             <div class="card-body">
-                <h5>{{ table.name }}</h5>
-                {% set active_orders = table.orders|rejectattr('is_closed')|list %}
-                {% set order = active_orders[-1] if active_orders else None %}
-                {% if order %}
-                    <div class="d-flex flex-wrap gap-2 mb-2">
-                        <span class="badge {% if order.fulfillment_status == fulfillment_status_enum.SERVED %}bg-success{% else %}bg-danger{% endif %}">
-                            Servei: {{ order.fulfillment_status.label }}
-                        </span>
-                        <span class="badge {% if order.payment_status == payment_status_enum.PAID %}bg-success{% else %}bg-warning text-dark{% endif %}">
-                            Pagament: {{ order.payment_status.label }}
-                        </span>
+                <h5 class="mb-3">{{ table.name }}</h5>
+                {% if active_orders %}
+                    {% for order in active_orders %}
+                    <div class="mb-3 pb-3 {% if not loop.last %}border-bottom{% endif %}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <small class="text-muted">Comanda #{{ order.id }}</small>
+                            <small class="fw-bold">€ {{ '%.2f'|format(order.subtotal()) }}</small>
+                        </div>
+                        <div class="d-flex flex-wrap gap-1">
+                            <span class="badge {% if order.fulfillment_status == fulfillment_status_enum.SERVED %}bg-success{% else %}bg-danger{% endif %} badge-sm">
+                                {{ order.fulfillment_status.label }}
+                            </span>
+                            <span class="badge {% if order.payment_status == payment_status_enum.PAID %}bg-success{% else %}bg-warning text-dark{% endif %} badge-sm">
+                                {{ order.payment_status.label }}
+                            </span>
+                        </div>
                     </div>
-                    <p class="mb-0">Total: € {{ '%.2f'|format(order.subtotal()) }}</p>
+                    {% endfor %}
                 {% else %}
                     <span class="badge bg-secondary">Lliure</span>
                 {% endif %}

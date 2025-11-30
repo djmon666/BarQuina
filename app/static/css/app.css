@@ -284,3 +284,13 @@ body {
         font-size: 1.1rem;
     }
 }
+
+/* Dashboard table cards */
+.badge-sm {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.card-body .border-bottom {
+    border-color: rgba(0, 0, 0, 0.1) !important;
+}
