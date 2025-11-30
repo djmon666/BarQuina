@@ -14,7 +14,7 @@
 <body class="min-vh-100 d-flex flex-column">
 <nav class="navbar navbar-dark bg-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="{{ url_for('mobile.tables') }}">Terminal Mòbil</a>
+        <a class="navbar-brand" href="{{ url_for('mobile.tables') }}">Comandes</a>
         <div class="d-flex gap-2 align-items-center">
             {% if current_user.is_authenticated %}
                 <span class="text-white-50 small">{{ current_user.username }}</span>
