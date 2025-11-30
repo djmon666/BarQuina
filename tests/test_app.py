@@ -766,3 +766,102 @@ def test_inventory_entry_can_be_deleted(client):
     with client.application.app_context():
         deleted = db.session.get(InventoryEntry, entry_id)
         assert deleted is None
+
+
+def test_bar_queue_shows_auto_prepared_items(client):
+    """Test that bar queue shows auto-prepared items that are prepared but not served."""
+    with client.application.app_context():
+        table = Table(name="T1", seats=4)
+        
+        # Create auto-prepared category (drinks, etc.)
+        drinks_category = _get_category("Begudes", auto_prepare=True)
+        
+        # Create products
+        beer = Product(name="Cervesa", price=2.5, category=drinks_category)
+        
+        db.session.add_all([table, beer])
+        db.session.commit()
+        
+        # Create order with auto-prepared item
+        order = Order(table_id=table.id)
+        db.session.add(order)
+        db.session.flush()
+        
+        # Auto-prepared items start in PREPARED status
+        item = OrderItem(
+            order_id=order.id,
+            product_id=beer.id,
+            quantity=2,
+            unit_price=beer.price,
+            status=OrderItemStatus.PREPARED,
+        )
+        db.session.add(item)
+        db.session.commit()
+        
+        order_id = order.id
+        item_id = item.id
+    
+    # Bar queue should show this item
+    response = client.get("/bar/")
+    assert response.status_code == 200
+    assert b"Cervesa" in response.data
+    assert b"Per servir" in response.data
+    
+    # Mark item as served
+    response = client.post(f"/bar/orders/{order_id}/items/{item_id}/served", follow_redirects=True)
+    assert response.status_code == 200
+    
+    with client.application.app_context():
+        item = db.session.get(OrderItem, item_id)
+        assert item.status == OrderItemStatus.SERVED
+    
+    # Item should no longer appear in bar queue
+    response = client.get("/bar/")
+    assert response.status_code == 200
+    assert b"No hi ha comandes pendents de barra" in response.data
+
+
+def test_bar_mark_all_served(client):
+    """Test marking all bar items in an order as served."""
+    with client.application.app_context():
+        table = Table(name="T2", seats=4)
+        drinks_category = _get_category("Begudes", auto_prepare=True)
+        
+        beer = Product(name="Cervesa", price=2.5, category=drinks_category)
+        wine = Product(name="Vi", price=3.0, category=drinks_category)
+        
+        db.session.add_all([table, beer, wine])
+        db.session.commit()
+        
+        order = Order(table_id=table.id)
+        db.session.add(order)
+        db.session.flush()
+        
+        item1 = OrderItem(
+            order_id=order.id,
+            product_id=beer.id,
+            quantity=2,
+            unit_price=beer.price,
+            status=OrderItemStatus.PREPARED,
+        )
+        item2 = OrderItem(
+            order_id=order.id,
+            product_id=wine.id,
+            quantity=1,
+            unit_price=wine.price,
+            status=OrderItemStatus.PREPARED,
+        )
+        db.session.add_all([item1, item2])
+        db.session.commit()
+        
+        order_id = order.id
+    
+    # Mark all items as served
+    response = client.post(f"/bar/orders/{order_id}/all-served", follow_redirects=True)
+    assert response.status_code == 200
+    assert b"2 productes de barra servits" in response.data
+    
+    with client.application.app_context():
+        order = db.session.get(Order, order_id)
+        for item in order.items:
+            assert item.status == OrderItemStatus.SERVED
