@@ -239,3 +239,48 @@ body {
 .kitchen-line .btn {
     white-space: nowrap;
 }
+
+/* Sidebar Menu Styles */
+.offcanvas {
+    width: 280px !important;
+}
+
+.offcanvas-body .nav-link {
+    padding: 0.75rem 1rem;
+    transition: background-color 0.2s ease;
+    border-left: 3px solid transparent;
+}
+
+.offcanvas-body .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-left-color: #0d6efd;
+}
+
+.offcanvas-body .nav-link.active,
+.offcanvas-body .nav-link[href="{{ request.path }}"] {
+    background-color: rgba(13, 110, 253, 0.15);
+    border-left-color: #0d6efd;
+}
+
+.nav-section h6 {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.offcanvas-body .nav-link i {
+    width: 1.5rem;
+    display: inline-block;
+}
+
+/* Mobile responsive navbar */
+@media (max-width: 768px) {
+    .container {
+        padding-left: 15px;
+        padding-right: 15px;
+    }
+    
+    .navbar-brand {
+        font-size: 1.1rem;
+    }
+}
