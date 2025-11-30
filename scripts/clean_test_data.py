@@ -13,7 +13,7 @@ Use this to clean test data or reset the system between events.
 """
 import sys
 from app import create_app, db
-from app.models import Order, OrderItem, Table, Category, Product
+from app.models import Order, OrderItem, Table, Category, Product, Payment, OrderItemExtra, PaymentItem
 
 def reset_order_data(force=False):
     """
@@ -33,6 +33,9 @@ def reset_order_data(force=False):
         # Count current data
         orders_count = Order.query.count()
         items_count = OrderItem.query.count()
+        payments_count = Payment.query.count()
+        payment_items_count = PaymentItem.query.count()
+        extras_count = OrderItemExtra.query.count()
         tables_count = Table.query.count()
         categories_count = Category.query.count()
         products_count = Product.query.count()
@@ -40,6 +43,9 @@ def reset_order_data(force=False):
         print(f"📊 Estat actual:")
         print(f"  Comandes: {orders_count}")
         print(f"  Items de comanda: {items_count}")
+        print(f"  Pagaments: {payments_count}")
+        print(f"  Enllaços de pagament: {payment_items_count}")
+        print(f"  Extres: {extras_count}")
         print()
         print(f"📦 Dades que es MANTINDRAN:")
         print(f"  Taules: {tables_count}")
@@ -47,7 +53,7 @@ def reset_order_data(force=False):
         print(f"  Productes: {products_count}")
         print()
         
-        if orders_count == 0 and items_count == 0:
+        if orders_count == 0 and items_count == 0 and payments_count == 0 and payment_items_count == 0:
             print("✅ La base de dades ja està neta!")
             return
         
@@ -58,6 +64,8 @@ def reset_order_data(force=False):
             print("   - Totes les comandes en curs")
             print("   - L'historial de comandes")
             print("   - Tots els items de comanda")
+            print("   - Tots els pagaments")
+            print("   - Tots els extres")
             print()
             response = input("Vols continuar? (escriu 'SI' per confirmar): ")
             if response.upper() != 'SI':
@@ -68,10 +76,20 @@ def reset_order_data(force=False):
         print("🗑️  Esborrant dades...")
         
         try:
-            # Delete all order items first (foreign key constraint)
+            # Delete in order respecting foreign keys:
+            # 1. Order item extras (references order_items)
+            deleted_extras = OrderItemExtra.query.delete()
+            
+            # 2. Payment items (links between payments and order items)
+            deleted_payment_items = PaymentItem.query.delete()
+            
+            # 3. Order items (references orders)
             deleted_items = OrderItem.query.delete()
             
-            # Delete all orders
+            # 4. Payments (references orders)
+            deleted_payments = Payment.query.delete()
+            
+            # 5. Orders (root table)
             deleted_orders = Order.query.delete()
             
             # Commit changes
@@ -80,10 +98,16 @@ def reset_order_data(force=False):
             print(f"✅ Dades esborrades correctament:")
             print(f"   - {deleted_orders} comandes")
             print(f"   - {deleted_items} items de comanda")
+            print(f"   - {deleted_payments} pagaments")
+            print(f"   - {deleted_payment_items} enllaços de pagament")
+            print(f"   - {deleted_extras} extres")
             print()
             print("📊 Estat final:")
             print(f"   Comandes: {Order.query.count()}")
             print(f"   Items: {OrderItem.query.count()}")
+            print(f"   Pagaments: {Payment.query.count()}")
+            print(f"   Enllaços: {PaymentItem.query.count()}")
+            print(f"   Extres: {OrderItemExtra.query.count()}")
             print()
             print("=" * 70)
             print("✨ Reset completat! La BD està llesta per usar.")

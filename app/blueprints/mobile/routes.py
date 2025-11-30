@@ -19,7 +19,7 @@ from ...models import (
     StaffUser,
     Table,
 )
-from ...realtime import emit_order_update
+from ...realtime import emit_order_update, emit_order_created
 from ...extras_utils import apply_extras_to_item, collect_extra_counts
 from ...audit_utils import log_order_event, log_order_status_change
 
@@ -126,7 +126,7 @@ def create_order(table_id: int):
         details={"source": "mobile", "table": table.name},
     )
     db.session.commit()
-    emit_order_update(order)
+    emit_order_created(order)  # Emit creation event for realtime updates
     flash(f"Nova comanda #{order.id} creada", "success")
     return redirect(url_for("mobile.table_orders", table_id=table.id, order_id=order.id))
 

@@ -20,6 +20,16 @@
             });
         });
 
+        socket.on("order_created", (payload) => {
+            orderListeners.forEach((callback) => {
+                try {
+                    callback(payload);
+                } catch (error) {
+                    console.error("Realtime handler error", error);
+                }
+            });
+        });
+
         return {
             socket,
             onOrderUpdate(callback) {

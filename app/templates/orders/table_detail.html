@@ -295,6 +295,7 @@
 {% endblock %}
 {% block scripts %}
 <script>
+document.addEventListener('DOMContentLoaded', function() {
 const checkboxes = Array.from(document.querySelectorAll('.js-item'));
 const output = document.getElementById('selectedTotal');
 const selectAllButton = document.getElementById('selectAllItems');
@@ -425,57 +426,65 @@ document.querySelectorAll('.js-cash-minus').forEach((btn) => {
 
 updateSubtotal();
 updateCashSummary();
-</script>
-{% if order %}
-<script>
+
+// Modal product picker
 const modalQtyInputs = document.querySelectorAll('#productPickerModal .js-qty');
 const modalExtraInputs = document.querySelectorAll('#productPickerModal .js-extra');
 const modalTotalOutput = document.getElementById('modalSelectionTotal');
-function modalUpdateTotal() {
-    let total = 0;
-    modalQtyInputs.forEach((input) => {
-        const count = parseInt(input.value || '0', 10);
-        if (count > 0) {
-            total += count * parseFloat(input.dataset.price);
+
+if (modalQtyInputs.length > 0) {
+    function modalUpdateTotal() {
+        let total = 0;
+        modalQtyInputs.forEach((input) => {
+            const count = parseInt(input.value || '0', 10);
+            if (count > 0) {
+                total += count * parseFloat(input.dataset.price);
+            }
+        });
+        modalExtraInputs.forEach((input) => {
+            const count = parseInt(input.value || '0', 10);
+            if (count > 0) {
+                total += count * parseFloat(input.dataset.extraPrice || '0');
+            }
+        });
+        if (modalTotalOutput) {
+            modalTotalOutput.textContent = `€ ${total.toFixed(2)}`;
         }
-    });
-    modalExtraInputs.forEach((input) => {
-        const count = parseInt(input.value || '0', 10);
-        if (count > 0) {
-            total += count * parseFloat(input.dataset.extraPrice || '0');
-        }
-    });
-    if (modalTotalOutput) {
-        modalTotalOutput.textContent = `€ ${total.toFixed(2)}`;
     }
-}
-function modalAdjustValue(targetId, delta) {
-    const input = document.getElementById(targetId);
-    if (!input) return;
-    const current = parseInt(input.value || '0', 10);
-    const next = Math.max(current + delta, 0);
-    input.value = next;
+    function modalAdjustValue(targetId, delta) {
+        const input = document.getElementById(targetId);
+        if (!input) return;
+        const current = parseInt(input.value || '0', 10);
+        const next = Math.max(current + delta, 0);
+        input.value = next;
+        modalUpdateTotal();
+    }
+    document.querySelectorAll('#productPickerModal .js-plus').forEach((btn) => {
+        btn.addEventListener('click', () => modalAdjustValue(btn.dataset.target, 1));
+    });
+    document.querySelectorAll('#productPickerModal .js-minus').forEach((btn) => {
+        btn.addEventListener('click', () => modalAdjustValue(btn.dataset.target, -1));
+    });
+    modalQtyInputs.forEach((input) => input.addEventListener('input', modalUpdateTotal));
+    modalExtraInputs.forEach((input) => input.addEventListener('input', modalUpdateTotal));
     modalUpdateTotal();
 }
-document.querySelectorAll('#productPickerModal .js-plus').forEach((btn) => {
-    btn.addEventListener('click', () => modalAdjustValue(btn.dataset.target, 1));
-});
-document.querySelectorAll('#productPickerModal .js-minus').forEach((btn) => {
-    btn.addEventListener('click', () => modalAdjustValue(btn.dataset.target, -1));
-});
-modalQtyInputs.forEach((input) => input.addEventListener('input', modalUpdateTotal));
-modalExtraInputs.forEach((input) => input.addEventListener('input', modalUpdateTotal));
-modalUpdateTotal();
-</script>
-{% endif %}
-<script>
+
+// Realtime updates
 if (window.barquinaRealtime) {
     const watchedTableId = Number('{{ table.id }}');
     window.barquinaRealtime.onOrderUpdate((payload) => {
-        if (payload && payload.table_id === watchedTableId) {
-            window.location.reload();
+        // Reload if:
+        // 1. Update affects the current table (specific order changed)
+        // 2. Any new order created (to update global counter)
+        if (payload) {
+            if (payload.table_id === watchedTableId || payload.order_id) {
+                window.location.reload();
+            }
         }
     });
 }
+
+}); // End DOMContentLoaded
 </script>
 {% endblock %}
