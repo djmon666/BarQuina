@@ -3,7 +3,7 @@
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
     <div>
         <h1 class="mb-0">Control de barra</h1>
-        <p class="text-muted mb-0">{{ total_pending_items }} línia{% if total_pending_items != 1 %}s{% endif %} per servir</p>
+        <p class="text-muted mb-0">{{ total_pending_items }} línia{% if total_pending_items != 1 %}s{% endif %} llest{% if total_pending_items != 1 %}es{% endif %} per servir</p>
     </div>
     <div class="d-flex gap-2">
         <a class="btn btn-outline-secondary" href="/">← Tornar al quadre</a>
@@ -21,18 +21,16 @@
                     <small class="text-muted">Entrada {{ order.created_at.strftime('%H:%M') }}</small>
                 </div>
                 <span class="badge text-bg-dark-emphasis kitchen-order-badge">#{{ order.id }}</span>
-                <form method="post" action="{{ url_for('bar.mark_order_served', order_id=order.id) }}">
-                    <button class="btn btn-sm btn-outline-success" type="submit">Tot servit</button>
-                </form>
             </div>
             <div class="card-body">
                 <ul class="list-unstyled mb-0">
                     {% for item in items %}
-                    <li class="kitchen-line d-flex justify-content-between gap-3 align-items-start">
-                        <div>
-                            <div class="fw-semibold d-flex flex-column">
+                    <li class="kitchen-line bar-item d-flex justify-content-between gap-3 align-items-start" 
+                        data-item-id="{{ item.id }}"
+                        style="cursor: pointer; transition: background-color 0.3s;">
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold">
                                 <span>{{ item.quantity }}× {{ item.product.name }}</span>
-                                <span class="badge bg-info kitchen-preparing-badge align-self-start mt-1">Preparat · Per servir</span>
                             </div>
                             {% if item.extras %}
                             <ul class="list-unstyled small text-muted mb-1">
@@ -42,12 +40,12 @@
                             </ul>
                             {% endif %}
                             {% if item.notes %}
-                            <div class="badge bg-warning-subtle text-dark">Nota: {{ item.notes }}</div>
+                            <div class="badge bg-warning-subtle text-dark mt-1">Nota: {{ item.notes }}</div>
                             {% endif %}
                         </div>
-                        <form method="post" action="{{ url_for('bar.mark_item_served', order_id=order.id, item_id=item.id) }}">
-                            <button class="btn btn-success btn-sm">Servit</button>
-                        </form>
+                        <div class="text-end">
+                            <span class="badge bg-info bar-badge">Pendent de preparar</span>
+                        </div>
                     </li>
                     {% endfor %}
                 </ul>
@@ -57,11 +55,87 @@
     {% endfor %}
 </div>
 {% else %}
-<div class="alert alert-success">No hi ha comandes pendents de barra ara mateix 🎉</div>
+<div class="alert alert-info">No hi ha productes pendents de servir ara mateix ✨</div>
 {% endif %}
 {% endblock %}
 {% block scripts %}
 <script>
+// Load saved states from localStorage
+document.addEventListener('DOMContentLoaded', function() {
+    const savedStates = JSON.parse(localStorage.getItem('barItemStates') || '{}');
+    
+    document.querySelectorAll('.bar-item').forEach(item => {
+        const itemId = item.dataset.itemId;
+        if (savedStates[itemId]) {
+            toggleBarItemReady(item, false); // Apply without saving again
+        }
+    });
+});
+
+// Toggle item ready state
+document.querySelectorAll('.bar-item').forEach(item => {
+    item.addEventListener('click', function() {
+        toggleBarItemReady(this, true);
+    });
+});
+
+function toggleBarItemReady(item, shouldSave) {
+    const badge = item.querySelector('.bar-badge');
+    const itemId = item.dataset.itemId;
+    const isReady = badge.textContent.trim() === 'A punt a barra';
+    
+    if (isReady) {
+        // Back to pending
+        badge.textContent = 'Pendent de preparar';
+        badge.className = 'badge bg-info bar-badge';
+        item.style.backgroundColor = '';
+        if (shouldSave) {
+            removeFromLocalStorage(itemId);
+        }
+    } else {
+        // Mark as ready
+        badge.textContent = 'A punt a barra';
+        badge.className = 'badge bg-success bar-badge';
+        item.style.backgroundColor = 'rgba(40, 196, 143, 0.15)';
+        if (shouldSave) {
+            saveToLocalStorage(itemId);
+        }
+    }
+}
+
+function saveToLocalStorage(itemId) {
+    const savedStates = JSON.parse(localStorage.getItem('barItemStates') || '{}');
+    savedStates[itemId] = true;
+    localStorage.setItem('barItemStates', JSON.stringify(savedStates));
+}
+
+function removeFromLocalStorage(itemId) {
+    const savedStates = JSON.parse(localStorage.getItem('barItemStates') || '{}');
+    delete savedStates[itemId];
+    localStorage.setItem('barItemStates', JSON.stringify(savedStates));
+}
+
+// Clean up old items from localStorage that are no longer on page
+function cleanupLocalStorage() {
+    const currentItems = Array.from(document.querySelectorAll('.bar-item')).map(el => el.dataset.itemId);
+    const savedStates = JSON.parse(localStorage.getItem('barItemStates') || '{}');
+    let modified = false;
+    
+    for (const itemId in savedStates) {
+        if (!currentItems.includes(itemId)) {
+            delete savedStates[itemId];
+            modified = true;
+        }
+    }
+    
+    if (modified) {
+        localStorage.setItem('barItemStates', JSON.stringify(savedStates));
+    }
+}
+
+cleanupLocalStorage();
+
+// Realtime updates
 if (window.barquinaRealtime) {
     window.barquinaRealtime.onOrderUpdate(() => {
         window.location.reload();
