@@ -111,11 +111,20 @@ def table_detail(table_id: int):
         if not order:
             flash("No hem trobat la comanda indicada", "warning")
     if not order:
+        # Try to find a pending order for this table first
         order = (
             Order.query.filter_by(table_id=table.id)
+            .filter(Order.payment_status != PaymentStatus.PAID)
             .order_by(Order.created_at.desc())
             .first()
         )
+        # If no pending orders for this table, get the most recent one (even if paid)
+        if not order:
+            order = (
+                Order.query.filter_by(table_id=table.id)
+                .order_by(Order.created_at.desc())
+                .first()
+            )
     pending_orders = (
         Order.query.filter(Order.table_id == table.id, Order.payment_status != PaymentStatus.PAID)
         .order_by(Order.created_at.desc())
@@ -417,4 +426,21 @@ def add_payment(order_id: int):
     db.session.commit()
     emit_order_update(order)
     flash("Pagament registrat", "success")
-    return redirect(url_for("orders.table_detail", table_id=order.table_id))
+    
+    # If order is now fully paid, redirect to next pending order
+    if order.payment_status == PaymentStatus.PAID:
+        # Find next pending order from any table
+        next_pending = (
+            Order.query.filter(Order.payment_status != PaymentStatus.PAID)
+            .order_by(Order.created_at.desc())
+            .first()
+        )
+        if next_pending:
+            flash(f"Comanda #{order.id} cobrada completament. Mostrant següent comanda pendent.", "info")
+            return redirect(url_for("orders.table_detail", table_id=next_pending.table_id, order_id=next_pending.id))
+        else:
+            flash(f"Comanda #{order.id} cobrada completament. No hi ha més comandes pendents.", "success")
+            return redirect(url_for("orders.list_tables"))
+    
+    # If still pending, stay on the same order
+    return redirect(url_for("orders.table_detail", table_id=order.table_id, order_id=order.id))
