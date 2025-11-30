@@ -152,16 +152,25 @@ def table_detail(table_id: int):
     global_prev_order: Order | None = None
     global_next_order: Order | None = None
     global_position: int | None = None
+    
     if order and global_open_orders:
+        # Try to find current order in the pending list
+        found = False
         for idx, open_order in enumerate(global_open_orders):
             if open_order.id != order.id:
                 continue
+            found = True
             global_position = idx
             if idx > 0:
                 global_prev_order = global_open_orders[idx - 1]
             if idx < len(global_open_orders) - 1:
                 global_next_order = global_open_orders[idx + 1]
             break
+        
+        # If current order is not in pending list (e.g., just paid), still provide navigation
+        if not found and global_open_orders:
+            # Set next to the first pending order
+            global_next_order = global_open_orders[0]
     product_groups = _grouped_products()
     audit_logs: list[OrderAuditLog] = []
     if order:
@@ -424,14 +433,22 @@ def add_payment(order_id: int):
         },
     )
     db.session.commit()
+    
+    # Expire all objects to force fresh queries from database
+    db.session.expire_all()
+    
     emit_order_update(order)
     flash("Pagament registrat", "success")
     
-    # If order is now fully paid, redirect to next pending order
-    if order.payment_status == PaymentStatus.PAID:
-        # Find next pending order from any table
+    # Re-query the order to get the updated payment_status
+    order_after_payment = Order.query.get(order.id)
+    
+    if order_after_payment and order_after_payment.payment_status == PaymentStatus.PAID:
+        # Find next pending order from any table (excluding the one we just paid)
         next_pending = (
-            Order.query.filter(Order.payment_status != PaymentStatus.PAID)
+            Order.query
+            .filter(Order.id != order.id)
+            .filter(Order.payment_status != PaymentStatus.PAID)
             .order_by(Order.created_at.desc())
             .first()
         )
@@ -442,5 +459,5 @@ def add_payment(order_id: int):
             flash(f"Comanda #{order.id} cobrada completament. No hi ha més comandes pendents.", "success")
             return redirect(url_for("orders.list_tables"))
     
-    # If still pending, stay on the same order
+    # If still pending, stay on the same order (with explicit order_id)
     return redirect(url_for("orders.table_detail", table_id=order.table_id, order_id=order.id))
