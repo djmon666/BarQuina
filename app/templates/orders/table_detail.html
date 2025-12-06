@@ -67,6 +67,21 @@
                             </button>
                         </form>
                     </div>
+                    <div class="d-flex gap-2 mt-1">
+                        <form method="post" action="{{ url_for('orders.print_kitchen_ticket', order_id=order.id) }}" class="m-0">
+                            <button type="submit" class="btn btn-sm btn-outline-primary" title="Imprimir tiquet de cuina">
+                                🖨️ Cuina
+                            </button>
+                        </form>
+                        {% if order.payments %}
+                        <form method="post" action="{{ url_for('orders.print_payment_ticket', order_id=order.id) }}" class="m-0" id="printPaymentForm">
+                            <input type="hidden" name="cash_given" id="cashGivenInput" value="0">
+                            <button type="submit" class="btn btn-sm btn-outline-success" title="Imprimir tiquet de caixa">
+                                🖨️ Caixa
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
                     <small class="text-muted">Clica una badge per canviar l'estat</small>
                 </div>
             </div>
@@ -320,6 +335,11 @@ function updateCashSummary() {
     if (cashChangeOutput) {
         const change = Math.max(tendered - selectedTotalValue, 0);
         cashChangeOutput.textContent = `€ ${change.toFixed(2)}`;
+    }
+    // Update hidden input for print form
+    const cashGivenInput = document.getElementById('cashGivenInput');
+    if (cashGivenInput) {
+        cashGivenInput.value = tendered.toFixed(2);
     }
 }
 

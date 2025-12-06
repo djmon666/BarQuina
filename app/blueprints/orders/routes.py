@@ -25,6 +25,7 @@ from ...models import (
 from ...realtime import emit_order_update
 from ...extras_utils import apply_extras_to_item, collect_extra_counts
 from ...audit_utils import log_order_event, log_order_status_change
+from ...print_utils import print_payment_receipt, print_kitchen_receipt
 
 bp = Blueprint("orders", __name__, url_prefix="")
 
@@ -460,4 +461,46 @@ def add_payment(order_id: int):
             return redirect(url_for("orders.list_tables"))
     
     # If still pending, stay on the same order (with explicit order_id)
+    return redirect(url_for("orders.table_detail", table_id=order.table_id, order_id=order.id))
+
+
+@bp.route("/orders/<int:order_id>/print/payment", methods=["POST"])
+def print_payment_ticket(order_id: int):
+    """Imprimeix tiquet de caixa per una comanda"""
+    order = Order.query.get_or_404(order_id)
+    
+    # Obtenir l'últim pagament
+    last_payment = Payment.query.filter_by(order_id=order.id).order_by(Payment.created_at.desc()).first()
+    
+    if not last_payment:
+        flash("No hi ha pagaments per imprimir", "warning")
+        return redirect(url_for("orders.table_detail", table_id=order.table_id, order_id=order.id))
+    
+    # Obtenir efectiu donat (si s'ha enviat)
+    cash_given = float(request.form.get("cash_given", 0))
+    
+    # Enviar a imprimir
+    success, message = print_payment_receipt(order, last_payment, cash_given)
+    
+    if success:
+        flash("Tiquet de caixa imprès correctament", "success")
+    else:
+        flash(f"Error d'impressió: {message}", "danger")
+    
+    return redirect(url_for("orders.table_detail", table_id=order.table_id, order_id=order.id))
+
+
+@bp.route("/orders/<int:order_id>/print/kitchen", methods=["POST"])
+def print_kitchen_ticket(order_id: int):
+    """Imprimeix tiquet de cuina per una comanda"""
+    order = Order.query.get_or_404(order_id)
+    
+    # Enviar a imprimir
+    success, message = print_kitchen_receipt(order)
+    
+    if success:
+        flash("Tiquet de cuina imprès correctament", "success")
+    else:
+        flash(f"Error d'impressió: {message}", "danger")
+    
     return redirect(url_for("orders.table_detail", table_id=order.table_id, order_id=order.id))
