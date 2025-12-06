@@ -31,23 +31,28 @@ def format_thermal_receipt(content: str, width: int = 48) -> str:
 
 def print_text(text: str) -> Tuple[bool, str]:
     """
-    Envia text a la impresora utilitzant lpr (sistema CUPS del Mac)
-    Afegeix comandes ESC/POS per feed i tall de paper
+    Envia text a la impresora utilitzant lpr amb opcions RAW
+    per evitar formatatge de CUPS
     """
     try:
-        # Comandes ESC/POS per Epson
+        # Comandes ESC/POS
         ESC = b'\x1b'
         GS = b'\x1d'
         
-        # Feed i tall de paper (partial cut)
-        # ESC d n: Imprimeix i avança n línies
-        # GS V m: Talla el paper (m=1 = tall parcial)
-        FEED_AND_CUT = ESC + b'd\x05' + GS + b'V\x01'
+        # Inicialitza impresora en mode text
+        INIT = ESC + b'@'
         
-        # Combina el text amb les comandes de tall
-        full_content = text.encode('utf-8') + FEED_AND_CUT
+        # Configura mida de lletra normal (12x24)
+        FONT_NORMAL = ESC + b'!' + b'\x00'
         
-        # Crea un procés per enviar a la impresora
+        # Afegeix línies buides i comanda de tall
+        FEED_LINES = b'\n' * 6
+        CUT = GS + b'V\x01'  # Tall parcial
+        
+        # Combina tot
+        full_content = INIT + FONT_NORMAL + text.encode('utf-8') + FEED_LINES + CUT
+        
+        # Envia amb lpr en mode RAW (sense processar)
         process = subprocess.Popen(
             ['lpr', '-P', PRINTER_NAME, '-o', 'raw'],
             stdin=subprocess.PIPE,
@@ -55,7 +60,6 @@ def print_text(text: str) -> Tuple[bool, str]:
             stderr=subprocess.PIPE
         )
         
-        # Envia el contingut amb les comandes
         stdout, stderr = process.communicate(input=full_content)
         
         if process.returncode == 0:
