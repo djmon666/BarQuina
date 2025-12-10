@@ -110,15 +110,15 @@ def generate_payment_receipt(order: Order, payment: Payment, cash_given: float =
     lines.append(left_right_text(f"Pagament: {payment_method}", "", width))
     
     # Mostrar efectiu donat i canvi
-    if cash_given > 0:
-        lines.append("")
-        lines.append(left_right_text("PAGAT:", format_price(cash_given), width))
-        change = cash_given - payment.amount
-        if change >= 0:
-            lines.append(left_right_text("CANVI:", format_price(change), width))
-        elif change < 0:
-            # Si cash_given és menor que el total (pagament parcial)
-            lines.append(left_right_text("PENDENT:", format_price(abs(change)), width))
+    
+    lines.append("")
+    lines.append(left_right_text("PAGAT:", format_price(cash_given), width))
+    change = cash_given - payment.amount
+    if change >= 0:
+        lines.append(left_right_text("CANVI:", format_price(change), width))
+    elif change < 0:
+        # Si cash_given és menor que el total (pagament parcial)
+        lines.append(left_right_text("PENDENT:", format_price(abs(change)), width))
     
     lines.append("")
     lines.append(line_separator())
