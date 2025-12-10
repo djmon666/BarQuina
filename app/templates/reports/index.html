@@ -13,12 +13,20 @@
                 {% if stat.session.is_open %}Oberta{% else %}Tancada{% endif %}
             </span>
         </div>
-        <small class="text-muted">
-            {{ stat.session.opened_at.strftime('%d/%m/%Y %H:%M') }}
-            {% if stat.session.closed_at %}
-            - {{ stat.session.closed_at.strftime('%d/%m/%Y %H:%M') }}
-            {% endif %}
-        </small>
+        <div class="d-flex align-items-center gap-2">
+            <small class="text-muted me-3">
+                {{ stat.session.opened_at.strftime('%d/%m/%Y %H:%M') }}
+                {% if stat.session.closed_at %}
+                - {{ stat.session.closed_at.strftime('%d/%m/%Y %H:%M') }}
+                {% endif %}
+            </small>
+            <a href="{{ url_for('reports.export_pdf', session_id=stat.session.id) }}" class="btn btn-sm btn-danger" title="Exportar a PDF">
+                <i class="bi bi-file-pdf"></i> PDF
+            </a>
+            <a href="{{ url_for('reports.export_excel', session_id=stat.session.id) }}" class="btn btn-sm btn-success" title="Exportar a Excel">
+                <i class="bi bi-file-excel"></i> Excel
+            </a>
+        </div>
     </div>
     <div class="card-body">
         <div class="row">
