@@ -121,7 +121,19 @@ def inventory():
 
     entries = InventoryEntry.query.order_by(InventoryEntry.purchased_at.desc()).limit(50).all()
     sessions = CashSession.query.order_by(CashSession.opened_at.desc()).limit(20).all()
-    return render_template("catalog/inventory.html", entries=entries, sessions=sessions)
+    
+    # Obtenir categories dels productes
+    categories = Category.query.filter_by(is_active=True).order_by(Category.name).all()
+    
+    # Obtenir llista de proveïdors únics
+    vendors_query = db.session.query(InventoryEntry.vendor).filter(
+        InventoryEntry.vendor.isnot(None),
+        InventoryEntry.vendor != ''
+    ).distinct().order_by(InventoryEntry.vendor).all()
+    vendors = [v[0] for v in vendors_query]
+    
+    return render_template("catalog/inventory.html", entries=entries, sessions=sessions, 
+                         categories=categories, vendors=vendors)
 
 
 @bp.route("/inventory/<int:entry_id>/assign-session", methods=["POST"])
