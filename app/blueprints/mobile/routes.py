@@ -22,6 +22,7 @@ from ...models import (
 from ...realtime import emit_order_update, emit_order_created
 from ...extras_utils import apply_extras_to_item, collect_extra_counts
 from ...audit_utils import log_order_event, log_order_status_change
+from ...print_utils import print_kitchen_receipt
 
 bp = Blueprint("mobile", __name__, url_prefix="/mobile")
 
@@ -228,7 +229,16 @@ def add_items(order_id: int):
         )
         db.session.commit()
         emit_order_update(order)
-        flash(f"Afegits {added_items} articles", "success")
+        
+        # Imprimeix automàticament el tiquet de cuina
+        try:
+            success, message = print_kitchen_receipt(order)
+            if success:
+                flash(f"Afegits {added_items} articles i tiquet de cuina imprès", "success")
+            else:
+                flash(f"Afegits {added_items} articles però error d'impressió: {message}", "warning")
+        except Exception as e:
+            flash(f"Afegits {added_items} articles però error d'impressió: {str(e)}", "warning")
     else:
         flash("Cap producte seleccionat", "warning")
 
