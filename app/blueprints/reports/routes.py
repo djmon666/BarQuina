@@ -32,27 +32,42 @@ def index():
 
     session_stats = []
     for session in sessions:
-        # Aggregate product quantities sold during this session
-        product_sales = (
-            db.session.query(
-                OrderItem.product_id,
-                func.sum(OrderItem.quantity).label("total_quantity"),
-            )
+        # Obtenir tots els OrderItems pagats durant aquesta sessió
+        from ...models import Product, OrderItemExtra, PaymentItem
+        
+        paid_items = (
+            db.session.query(OrderItem)
             .join(OrderItem.payment_links)
             .join(Payment)
             .filter(Payment.cash_session_id == session.id)
-            .group_by(OrderItem.product_id)
             .all()
         )
-
-        # Build product summary with names
-        products_sold = []
-        for product_id, qty in product_sales:
-            from ...models import Product
-
-            product = db.session.get(Product, product_id)
-            if product:
-                products_sold.append({"name": product.name, "quantity": qty})
+        
+        # Agrupar productes amb els seus extres
+        product_combinations = defaultdict(int)
+        
+        for item in paid_items:
+            # Obtenir nom del producte
+            product = db.session.get(Product, item.product_id)
+            if not product:
+                continue
+            
+            product_name = product.name
+            
+            # Afegir extres si n'hi ha
+            if item.extras:
+                extras_labels = sorted([extra.label for extra in item.extras])
+                if extras_labels:
+                    product_name += " (" + ", ".join(extras_labels) + ")"
+            
+            # Sumar quantitat
+            product_combinations[product_name] += item.quantity
+        
+        # Convertir a llista ordenada per quantitat
+        products_sold = [
+            {"name": name, "quantity": qty}
+            for name, qty in sorted(product_combinations.items(), key=lambda x: -x[1])
+        ]
 
         session_stats.append(
             {
