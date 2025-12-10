@@ -237,7 +237,7 @@ def export_pdf(session_id):
             inventory_data.append([
                 entry.product_name,
                 f"{entry.quantity:.2f}",
-                f"{entry.unit_price:.2f} €",
+                f"{entry.unit_cost:.2f} €",
                 f"{entry.total_cost:.2f} €"
             ])
         
@@ -370,7 +370,7 @@ def export_excel(session_id):
             ws[f'A{row}'] = entry.product_name
             ws[f'B{row}'] = entry.quantity
             ws[f'B{row}'].number_format = '0.00'
-            ws[f'C{row}'] = entry.unit_price
+            ws[f'C{row}'] = entry.unit_cost
             ws[f'C{row}'].number_format = '0.00'
             ws[f'D{row}'] = entry.total_cost
             ws[f'D{row}'].number_format = '0.00'
