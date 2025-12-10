@@ -1,6 +1,11 @@
 body {
     background-color: #f5f6fa;
 }
+
+/* Desactivar zoom amb doble tap en mòbils */
+button, .btn, .card, .list-group-item {
+    touch-action: manipulation;
+}
 .card h5 {
     margin-bottom: 0;
 }
