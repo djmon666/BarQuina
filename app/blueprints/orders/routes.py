@@ -459,7 +459,16 @@ def add_payment(order_id: int):
     db.session.expire_all()
     
     emit_order_update(order)
-    flash("Pagament registrat", "success")
+    
+    # Imprimeix automàticament el tiquet de caixa després de registrar el pagament
+    try:
+        success, message = print_payment_receipt(order, payment, cash_given)
+        if success:
+            flash("Pagament registrat i tiquet imprès", "success")
+        else:
+            flash(f"Pagament registrat però error d'impressió: {message}", "warning")
+    except Exception as e:
+        flash(f"Pagament registrat però error d'impressió: {str(e)}", "warning")
     
     # Re-query the order to get the updated payment_status
     order_after_payment = Order.query.get(order.id)
