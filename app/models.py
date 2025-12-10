@@ -277,6 +277,7 @@ class Payment(db.Model):
     amount = db.Column(db.Float, nullable=False)
     method = db.Column(db.Enum(PaymentMethod), default=PaymentMethod.CASH, nullable=False)
     note = db.Column(db.String(120))
+    cash_given = db.Column(db.Float, default=0.0)  # Efectiu donat pel client
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     cash_session_id = db.Column(db.Integer, db.ForeignKey("cash_sessions.id"))
 

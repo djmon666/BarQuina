@@ -382,6 +382,20 @@ def add_payment(order_id: int):
     method = request.form.get("method", PaymentMethod.CASH.value)
     item_ids = [int(item_id) for item_id in request.form.getlist("item_ids")]
     note = request.form.get("note", "")
+    
+    # Captura l'efectiu donat pels comptadors de bitllets/monedes
+    cash_given = 0.0
+    if method == PaymentMethod.CASH.value or method == 'efectiu':
+        # Suma tots els bitllets i monedes del formulari
+        for key, value in request.form.items():
+            if key.startswith('cash_') and value:
+                try:
+                    # Format: cash_50_00 -> 50.00
+                    denomination = float(key.replace('cash_', '').replace('_', '.'))
+                    count = int(value)
+                    cash_given += denomination * count
+                except (ValueError, AttributeError):
+                    pass
 
     if not item_ids:
         flash("Cal seleccionar com a mínim una línia", "warning")
@@ -405,7 +419,13 @@ def add_payment(order_id: int):
 
     amount = sum(item.line_total() for item in unpaid_items)
 
-    payment = Payment(order_id=order.id, amount=amount, method=PaymentMethod(method), note=note)
+    payment = Payment(
+        order_id=order.id, 
+        amount=amount, 
+        method=PaymentMethod(method), 
+        note=note,
+        cash_given=cash_given
+    )
     active_session = (
         CashSession.query.filter_by(is_open=True).order_by(CashSession.opened_at.desc()).first()
     )
@@ -476,8 +496,8 @@ def print_payment_ticket(order_id: int):
         flash("No hi ha pagaments per imprimir", "warning")
         return redirect(url_for("orders.table_detail", table_id=order.table_id, order_id=order.id))
     
-    # Obtenir efectiu donat (si s'ha enviat)
-    cash_given = float(request.form.get("cash_given", 0))
+    # Utilitzar el cash_given guardat al pagament
+    cash_given = last_payment.cash_given or 0.0
     
     # Enviar a imprimir
     success, message = print_payment_receipt(order, last_payment, cash_given)
