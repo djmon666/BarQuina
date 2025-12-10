@@ -114,7 +114,7 @@ def generate_payment_receipt(order: Order, payment: Payment, cash_given: float =
         lines.append("")
         lines.append(left_right_text("PAGAT:", format_price(cash_given), width))
         change = cash_given - payment.amount
-        if change > 0:
+        if change >= 0:
             lines.append(left_right_text("CANVI:", format_price(change), width))
         elif change < 0:
             # Si cash_given és menor que el total (pagament parcial)
