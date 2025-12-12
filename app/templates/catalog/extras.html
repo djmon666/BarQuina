@@ -28,20 +28,69 @@
             <div class="card-header">Extres disponibles</div>
             <div class="list-group list-group-flush">
                 {% for extra in extras %}
-                <form method="post" action="{{ url_for('catalog.extras') }}" class="list-group-item d-flex justify-content-between align-items-center">
+                <div class="list-group-item d-flex justify-content-between align-items-center">
                     <div>
-                        <div>{{ extra.name }}</div>
+                        <div><strong>{{ extra.name }}</strong></div>
                         <small class="text-muted">+€ {{ '%.2f'|format(extra.price_delta) }}</small>
+                        {% if extra.description %}
+                        <br><small class="text-muted">{{ extra.description }}</small>
+                        {% endif %}
                     </div>
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 align-items-center">
                         <span class="badge {% if extra.is_active %}bg-success{% else %}bg-secondary{% endif %}">
                             {% if extra.is_active %}Actiu{% else %}Inactiu{% endif %}
                         </span>
-                        <input type="hidden" name="action" value="toggle">
-                        <input type="hidden" name="extra_id" value="{{ extra.id }}">
-                        <button class="btn btn-outline-secondary btn-sm" type="submit">Alterna</button>
+                        <button class="btn btn-outline-primary btn-sm" type="button" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#editModal{{ extra.id }}"
+                                title="Editar">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <form method="post" action="{{ url_for('catalog.extras') }}" style="display: inline;">
+                            <input type="hidden" name="action" value="toggle">
+                            <input type="hidden" name="extra_id" value="{{ extra.id }}">
+                            <button class="btn btn-outline-secondary btn-sm" type="submit" title="Canviar estat">
+                                <i class="bi bi-toggle-{% if extra.is_active %}on{% else %}off{% endif %}"></i>
+                            </button>
+                        </form>
                     </div>
-                </form>
+                </div>
+                
+                <!-- Modal per editar -->
+                <div class="modal fade" id="editModal{{ extra.id }}" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form method="post" action="{{ url_for('catalog.extras') }}">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Editar extra</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <input type="hidden" name="action" value="edit">
+                                    <input type="hidden" name="extra_id" value="{{ extra.id }}">
+                                    <div class="form-floating mb-3">
+                                        <input class="form-control" name="name" value="{{ extra.name }}" required>
+                                        <label>Nom</label>
+                                    </div>
+                                    <div class="form-floating mb-3">
+                                        <input class="form-control" name="price" type="number" min="0" step="0.01" 
+                                               value="{{ '%.2f'|format(extra.price_delta) }}" required>
+                                        <label>Preu extra (€)</label>
+                                    </div>
+                                    <div class="form-floating mb-3">
+                                        <input class="form-control" name="description" 
+                                               value="{{ extra.description or '' }}" placeholder="Opcional">
+                                        <label>Descripció (opcional)</label>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel·lar</button>
+                                    <button type="submit" class="btn btn-primary">Desar canvis</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
                 {% else %}
                 <div class="list-group-item">Encara no hi ha extres.</div>
                 {% endfor %}

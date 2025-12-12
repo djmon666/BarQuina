@@ -188,6 +188,20 @@ def extras():
                 db.session.add(Extra(name=name, price_delta=price, description=description))
                 db.session.commit()
                 flash("Extra creat", "success")
+        elif action == "edit":
+            extra_id = request.form.get("extra_id", type=int)
+            extra = Extra.query.get_or_404(extra_id)
+            name = request.form.get("name", "").strip()
+            price = request.form.get("price", type=float)
+            description = request.form.get("description", "").strip()
+            if not name or price is None or price < 0:
+                flash("Nom i preu vàlids són obligatoris", "danger")
+            else:
+                extra.name = name
+                extra.price_delta = price
+                extra.description = description
+                db.session.commit()
+                flash("Extra actualitzat", "success")
         elif action == "toggle":
             extra_id = request.form.get("extra_id", type=int)
             extra = Extra.query.get_or_404(extra_id)
