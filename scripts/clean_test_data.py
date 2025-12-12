@@ -7,13 +7,17 @@ while preserving:
 - Tables (Taules)
 - Categories (Categories)
 - Products (Productes)
+- Extras definitions (Extres - configuració)
 - Users (Usuaris)
+
+Only removes transactional data (orders, payments, sessions, inventory entries).
 
 Use this to clean test data or reset the system between events.
 """
 import sys
 from app import create_app, db
-from app.models import Order, OrderItem, Table, Category, Product, Payment, OrderItemExtra, PaymentItem
+from app.models import (Order, OrderItem, Table, Category, Product, Payment, 
+                        OrderItemExtra, PaymentItem, CashSession, InventoryEntry)
 
 def reset_order_data(force=False):
     """
@@ -36,6 +40,8 @@ def reset_order_data(force=False):
         payments_count = Payment.query.count()
         payment_items_count = PaymentItem.query.count()
         extras_count = OrderItemExtra.query.count()
+        sessions_count = CashSession.query.count()
+        inventory_count = InventoryEntry.query.count()
         tables_count = Table.query.count()
         categories_count = Category.query.count()
         products_count = Product.query.count()
@@ -46,26 +52,35 @@ def reset_order_data(force=False):
         print(f"  Pagaments: {payments_count}")
         print(f"  Enllaços de pagament: {payment_items_count}")
         print(f"  Extres: {extras_count}")
+        print(f"  Sessions de caixa: {sessions_count}")
+        print(f"  Entrades d'inventari: {inventory_count}")
         print()
         print(f"📦 Dades que es MANTINDRAN:")
         print(f"  Taules: {tables_count}")
         print(f"  Categories: {categories_count}")
         print(f"  Productes: {products_count}")
+        print(f"  Extres (configuració): es mantenen")
+        print(f"  Usuaris: es mantenen")
         print()
         
-        if orders_count == 0 and items_count == 0 and payments_count == 0 and payment_items_count == 0:
+        if (orders_count == 0 and items_count == 0 and payments_count == 0 
+            and payment_items_count == 0 and sessions_count == 0 and inventory_count == 0):
             print("✅ La base de dades ja està neta!")
             return
         
         # Confirmation
         if not force:
-            print("⚠️  ATENCIÓ: Aquesta acció esborrarà TOTES les comandes!")
+            print("⚠️  ATENCIÓ: Aquesta acció esborrarà TOTES les dades de prova!")
             print("   Això inclou:")
             print("   - Totes les comandes en curs")
             print("   - L'historial de comandes")
             print("   - Tots els items de comanda")
             print("   - Tots els pagaments")
             print("   - Tots els extres")
+            print("   - Totes les sessions de caixa")
+            print("   - Tot l'inventari")
+            print()
+            print("   ES MANTINDRAN: Taules, Categories, Productes, Extres (configuració) i Usuaris")
             print()
             response = input("Vols continuar? (escriu 'SI' per confirmar): ")
             if response.upper() != 'SI':
@@ -83,14 +98,20 @@ def reset_order_data(force=False):
             # 2. Payment items (links between payments and order items)
             deleted_payment_items = PaymentItem.query.delete()
             
-            # 3. Order items (references orders)
+            # 3. Inventory entries (references cash_sessions)
+            deleted_inventory = InventoryEntry.query.delete()
+            
+            # 4. Order items (references orders)
             deleted_items = OrderItem.query.delete()
             
-            # 4. Payments (references orders)
+            # 5. Payments (references orders and cash_sessions)
             deleted_payments = Payment.query.delete()
             
-            # 5. Orders (root table)
+            # 6. Orders (root table)
             deleted_orders = Order.query.delete()
+            
+            # 7. Cash sessions (root table)
+            deleted_sessions = CashSession.query.delete()
             
             # Commit changes
             db.session.commit()
@@ -101,6 +122,8 @@ def reset_order_data(force=False):
             print(f"   - {deleted_payments} pagaments")
             print(f"   - {deleted_payment_items} enllaços de pagament")
             print(f"   - {deleted_extras} extres")
+            print(f"   - {deleted_sessions} sessions de caixa")
+            print(f"   - {deleted_inventory} entrades d'inventari")
             print()
             print("📊 Estat final:")
             print(f"   Comandes: {Order.query.count()}")
@@ -108,6 +131,8 @@ def reset_order_data(force=False):
             print(f"   Pagaments: {Payment.query.count()}")
             print(f"   Enllaços: {PaymentItem.query.count()}")
             print(f"   Extres: {OrderItemExtra.query.count()}")
+            print(f"   Sessions: {CashSession.query.count()}")
+            print(f"   Inventari: {InventoryEntry.query.count()}")
             print()
             print("=" * 70)
             print("✨ Reset completat! La BD està llesta per usar.")
