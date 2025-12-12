@@ -53,7 +53,7 @@ def landing():
 
 @bp.route("/tables")
 def tables():
-    table_list = Table.query.order_by(Table.name).all()
+    table_list = Table.query.order_by(db.cast(Table.name, db.Integer)).all()
     user = current_user if current_user.is_authenticated else None
     return render_template(
         "mobile/tables.html",

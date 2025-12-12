@@ -4,6 +4,7 @@ from flask import Blueprint, flash, redirect, render_template, url_for
 from flask_login import current_user
 from sqlalchemy import and_, or_
 
+from ...extensions import db
 from ...models import CashSession, FulfillmentStatus, Order, PaymentStatus, Table
 
 bp = Blueprint("dashboard", __name__)
@@ -24,7 +25,7 @@ def require_admin():
 
 @bp.route("/")
 def home():
-    tables = Table.query.order_by(Table.name).all()
+    tables = Table.query.order_by(db.cast(Table.name, db.Integer)).all()
     open_orders = (
         Order.query.filter(
             or_(

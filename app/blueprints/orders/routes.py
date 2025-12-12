@@ -98,7 +98,7 @@ def tables():
             flash("Taula creada", "success")
         return redirect(url_for("orders.tables"))
 
-    tables = Table.query.order_by(Table.name).all()
+    tables = Table.query.order_by(db.cast(Table.name, db.Integer)).all()
     return render_template("orders/tables.html", tables=tables)
 
 
