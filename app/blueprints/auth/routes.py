@@ -22,14 +22,16 @@ def login():
         
         user = StaffUser.query.filter_by(name=username).first()
         
-        if user and user.is_active and user.check_password(password):
+        if user and not user.is_active:
+            flash("Usuari desactivat. Demana a administració que t'activin", "warning")
+        elif user and user.check_password(password):
             login_user(user)
             next_page = request.args.get("next")
             if user.is_admin():
                 return redirect(next_page if next_page else url_for("dashboard.home"))
             return redirect(url_for("mobile.tables"))
-        
-        flash("Usuari o contrasenya incorrectes", "danger")
+        else:
+            flash("Usuari o contrasenya incorrectes", "danger")
     
     return render_template("auth/login.html")
 
