@@ -6,10 +6,12 @@ from datetime import datetime
 import requests
 from typing import Optional, Tuple
 from .models import Order, Payment
+from .realtime import emit_print_request
 
 # Configuració del servidor d'impressió
-PRINT_SERVER_URL = "http://192.168.1.36:5000/print"
+PRINT_SERVER_URL = "http://192.168.5.182:5000/print"
 PRINT_ENABLED = True  # Canvia a False per deshabilitar impressió
+USE_WEBSOCKET = True  # Utilitza websocket en lloc de HTTP
 
 def center_text(text: str, width: int = 48) -> str:
     """Centra text dins l'ample del paper"""
@@ -196,9 +198,13 @@ def generate_kitchen_receipt(order: Order) -> str:
     
     return "\n".join(lines)
 
-def send_to_printer(content: str) -> Tuple[bool, str]:
+def send_to_printer(content: str, print_type: str = "receipt") -> Tuple[bool, str]:
     """
-    Envia el contingut a la impresora via servidor d'impressió
+    Envia el contingut a la impresora via websocket o HTTP
+    
+    Args:
+        content: Contingut a imprimir
+        print_type: Tipus d'impressió ('receipt', 'kitchen', etc.)
     
     Returns:
         (success, message): Tupla amb resultat i missatge
@@ -206,6 +212,16 @@ def send_to_printer(content: str) -> Tuple[bool, str]:
     if not PRINT_ENABLED:
         return False, "Impressió deshabilitada"
     
+    # Prova primer amb websocket
+    if USE_WEBSOCKET:
+        try:
+            emit_print_request(content, print_type)
+            return True, "Enviada a imprimir via websocket"
+        except Exception as e:
+            # Si falla websocket, intenta HTTP com a fallback
+            pass
+    
+    # Fallback a HTTP
     try:
         response = requests.post(
             PRINT_SERVER_URL,
@@ -239,4 +255,4 @@ def print_kitchen_receipt(order: Order) -> Tuple[bool, str]:
     Genera i imprimeix tiquet de cuina
     """
     content = generate_kitchen_receipt(order)
-    return send_to_printer(content)
+    return send_to_printer(content, "kitchen")

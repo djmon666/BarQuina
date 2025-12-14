@@ -39,3 +39,18 @@ def emit_order_created(order: SupportsOrderLike) -> None:
         "outstanding_total": order.outstanding_total(),
     }
     socketio.emit("order_created", payload)
+
+
+def emit_print_request(content: str, print_type: str = "receipt") -> None:
+    """
+    Envia una petició d'impressió via websocket
+    
+    Args:
+        content: Contingut a imprimir
+        print_type: Tipus d'impressió ('receipt', 'kitchen', etc.)
+    """
+    payload = {
+        "content": content,
+        "type": print_type
+    }
+    socketio.emit("print_request", payload)

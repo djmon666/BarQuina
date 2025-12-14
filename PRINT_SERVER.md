@@ -32,7 +32,29 @@ pip install Flask flask-cors requests
 
 ## Executar el Servidor
 
-### Al Mac (on està connectada la impresora)
+### OPCIÓ 1: Client WebSocket (Recomanat per xarxes diferents)
+
+Si el Mac i el servidor Ubuntu estan a xarxes diferents però els websockets funcionen:
+
+**Al Mac (on està connectada la impresora):**
+
+```bash
+# Instal·la el client de Socket.IO
+pip3 install python-socketio[client]
+
+# Executa el client websocket
+python3 print_client_websocket.py
+```
+
+El client es connectarà al servidor Ubuntu via websocket i rebrà les peticions d'impressió.
+
+**Important**: Edita `print_client_websocket.py` si cal canviar:
+- `SERVER_URL`: IP del servidor Ubuntu (per defecte: `http://192.168.1.220:5000`)
+- `PRINTER_NAME`: Nom de la impresora (per defecte: `EPSON_TM_T20II`)
+
+### OPCIÓ 2: Servidor HTTP (Per xarxes locals)
+
+**Al Mac (on està connectada la impresora):**
 
 ```bash
 python3 print_server.py
@@ -43,6 +65,7 @@ El servidor s'iniciarà a `http://192.168.1.36:5000`
 **Important**: Assegura't que la IP del Mac és `192.168.1.36`. Si és diferent:
 1. Canvia la IP al fitxer `print_server.py` (línia `app.run(host='0.0.0.0', port=5000)`)
 2. Canvia també la IP a `app/print_utils.py` (variable `PRINT_SERVER_URL`)
+3. Canvia `USE_WEBSOCKET = False` a `app/print_utils.py`
 
 ## Provar la Impressió
 
