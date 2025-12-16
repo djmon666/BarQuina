@@ -2,7 +2,15 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>Sessions de caixa</h1>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#openSession">Obrir sessió</button>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('reports.index') }}" class="btn btn-info">
+            <i class="bi bi-graph-up"></i> Veure Resultats Detallats
+        </a>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#openSession">Obrir sessió</button>
+    </div>
+</div>
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Per veure el detall de productes venuts i resultats complets, clica a "Veure Resultats Detallats"
 </div>
 <div class="table-responsive">
 <table class="table table-striped align-middle">
@@ -99,6 +107,10 @@
                     <div class="form-floating mb-3">
                         <input class="form-control" name="opening_float" type="number" step="0.01" value="{{ '%.2f'|format(session.opening_float) }}" required>
                         <label>Float inicial</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                        <input class="form-control" name="opened_at" type="datetime-local" value="{{ session.opened_at.strftime('%Y-%m-%dT%H:%M') }}">
+                        <label>Data i hora d'obertura</label>
                     </div>
                     <div class="alert alert-light py-2 mb-3">
                         <div class="small text-muted">Les vendes es calculen automàticament amb els cobraments en sessió.</div>

@@ -84,6 +84,17 @@ def edit_session(session_id: int):
     if opening_float is None:
         flash("El fons inicial no pot quedar en blanc", "danger")
         return redirect(url_for("cash.sessions"))
+    
+    # Editar hora d'obertura si es proporciona
+    opened_at_str = request.form.get("opened_at")
+    if opened_at_str:
+        try:
+            from datetime import datetime
+            # Format: YYYY-MM-DDTHH:MM (del input datetime-local)
+            session.opened_at = datetime.fromisoformat(opened_at_str)
+        except ValueError:
+            flash("Format d'hora d'obertura invàlid", "danger")
+            return redirect(url_for("cash.sessions"))
 
     try:
         closing_amount = _parse_amount(request.form.get("closing_amount"), default=None)

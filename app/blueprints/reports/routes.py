@@ -74,10 +74,10 @@ def index():
             # Sumar quantitat
             product_combinations[product_name] += item.quantity
         
-        # Convertir a llista ordenada per quantitat
+        # Convertir a llista ordenada per nom de producte
         products_sold = [
             {"name": name, "quantity": qty}
-            for name, qty in sorted(product_combinations.items(), key=lambda x: -x[1])
+            for name, qty in sorted(product_combinations.items())
         ]
 
         session_stats.append(
@@ -110,23 +110,29 @@ def _get_session_data(session_id):
         .all()
     )
     
-    product_combinations = defaultdict(int)
+    product_combinations = defaultdict(lambda: {"quantity": 0, "price": 0})
     for item in paid_items:
         product = db.session.get(Product, item.product_id)
         if not product:
             continue
         
         product_name = product.name
+        total_price = product.price
+        
         if item.extras:
             extras_labels = sorted([extra.label for extra in item.extras])
             if extras_labels:
                 product_name += " (" + ", ".join(extras_labels) + ")"
+            # Sumar preu dels extres
+            for extra in item.extras:
+                total_price += extra.price_delta * extra.quantity
         
-        product_combinations[product_name] += item.quantity
+        product_combinations[product_name]["quantity"] += item.quantity
+        product_combinations[product_name]["price"] = total_price
     
     products_sold = [
-        {"name": name, "quantity": qty}
-        for name, qty in sorted(product_combinations.items(), key=lambda x: -x[1])
+        {"name": name, "quantity": data["quantity"], "price": data["price"]}
+        for name, data in sorted(product_combinations.items())
     ]
     
     # Obtenir compres d'inventari
@@ -305,15 +311,20 @@ def export_excel(session_id):
     
     ws[f'A{row}'] = "Producte"
     ws[f'B{row}'] = "Quantitat"
+    ws[f'C{row}'] = "Preu (€)"
     ws[f'A{row}'].fill = header_fill
     ws[f'B{row}'].fill = header_fill
+    ws[f'C{row}'].fill = header_fill
     ws[f'A{row}'].font = header_font
     ws[f'B{row}'].font = header_font
+    ws[f'C{row}'].font = header_font
     row += 1
     
     for item in data["products_sold"]:
         ws[f'A{row}'] = item["name"]
         ws[f'B{row}'] = item["quantity"]
+        ws[f'C{row}'] = item["price"]
+        ws[f'C{row}'].number_format = '0.00'
         row += 1
     
     # Resum financer
@@ -381,6 +392,7 @@ def export_excel(session_id):
     ws.column_dimensions['B'].width = 15
     ws.column_dimensions['C'].width = 15
     ws.column_dimensions['D'].width = 15
+    ws.column_dimensions['E'].width = 15
     
     # Guardar a buffer
     buffer = BytesIO()

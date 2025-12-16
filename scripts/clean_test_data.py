@@ -17,7 +17,7 @@ Use this to clean test data or reset the system between events.
 import sys
 from app import create_app, db
 from app.models import (Order, OrderItem, Table, Category, Product, Payment, 
-                        OrderItemExtra, PaymentItem, CashSession, InventoryEntry)
+                        OrderItemExtra, PaymentItem, CashSession, InventoryEntry, CashMovement)
 
 def reset_order_data(force=False):
     """
@@ -41,6 +41,7 @@ def reset_order_data(force=False):
         payment_items_count = PaymentItem.query.count()
         extras_count = OrderItemExtra.query.count()
         sessions_count = CashSession.query.count()
+        movements_count = CashMovement.query.count()
         inventory_count = InventoryEntry.query.count()
         tables_count = Table.query.count()
         categories_count = Category.query.count()
@@ -53,6 +54,7 @@ def reset_order_data(force=False):
         print(f"  Enllaços de pagament: {payment_items_count}")
         print(f"  Extres: {extras_count}")
         print(f"  Sessions de caixa: {sessions_count}")
+        print(f"  Moviments de caixa: {movements_count}")
         print(f"  Entrades d'inventari: {inventory_count}")
         print()
         print(f"📦 Dades que es MANTINDRAN:")
@@ -63,7 +65,7 @@ def reset_order_data(force=False):
         print(f"  Usuaris: es mantenen")
         print()
         
-        if (orders_count == 0 and items_count == 0 and payments_count == 0 
+        if (orders_count == 0 and items_count == 0 and payments_countmovements_count == 0 and  == 0 
             and payment_items_count == 0 and sessions_count == 0 and inventory_count == 0):
             print("✅ La base de dades ja està neta!")
             return
@@ -78,6 +80,7 @@ def reset_order_data(force=False):
             print("   - Tots els pagaments")
             print("   - Tots els extres")
             print("   - Totes les sessions de caixa")
+            print("   - Tots els moviments de caixa")
             print("   - Tot l'inventari")
             print()
             print("   ES MANTINDRAN: Taules, Categories, Productes, Extres (configuració) i Usuaris")
@@ -106,10 +109,13 @@ def reset_order_data(force=False):
             
             # 5. Payments (references orders and cash_sessions)
             deleted_payments = Payment.query.delete()
+            Cash movements (references cash_sessions)
+            deleted_movements = CashMovement.query.delete()
             
-            # 6. Orders (root table)
+            # 7. Orders (root table)
             deleted_orders = Order.query.delete()
             
+            # 8
             # 7. Cash sessions (root table)
             deleted_sessions = CashSession.query.delete()
             
@@ -119,6 +125,7 @@ def reset_order_data(force=False):
             print(f"✅ Dades esborrades correctament:")
             print(f"   - {deleted_orders} comandes")
             print(f"   - {deleted_items} items de comanda")
+            print(f"   - {deleted_movements} moviments de caixa")
             print(f"   - {deleted_payments} pagaments")
             print(f"   - {deleted_payment_items} enllaços de pagament")
             print(f"   - {deleted_extras} extres")
@@ -128,6 +135,7 @@ def reset_order_data(force=False):
             print("📊 Estat final:")
             print(f"   Comandes: {Order.query.count()}")
             print(f"   Items: {OrderItem.query.count()}")
+            print(f"   Moviments: {CashMovement.query.count()}")
             print(f"   Pagaments: {Payment.query.count()}")
             print(f"   Enllaços: {PaymentItem.query.count()}")
             print(f"   Extres: {OrderItemExtra.query.count()}")
